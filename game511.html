@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>切水果大师 - 最终版</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+        #game-container {
+            position: relative;
+            width: 800px; 
+            height: 600px;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+            border: 4px solid #4CAF50;
+            background-color: #111;
+        }
+        #game-canvas {
+            display: block;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+        }
+        .message {
+            font-size: 40px;
+            color: #FFEB3B;
+            margin-bottom: 20px;
+        }
+        .score-display {
+            font-size: 30px;
+            margin-top: 10px;
+        }
+        .start-button {
+            padding: 15px 30px;
+            font-size: 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 30px;
+        }
+        .start-button:hover {
+            background-color: #388E3C;
+        }
+        /* 刀光/切割路径样式 */
+        #knife-path {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🔪 切水果大师 🍉 (最终版)</h1>
+    
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+        <canvas id="knife-path" width="800" height="600"></canvas>
+        
+        <div id="overlay">
+            <div class="message">正在加载资源...</div>
+            <div class="score-display">请确保图片已上传到 images/ 文件夹</div>
+            <button id="start-button" class="start-button" style="display:none;">开始游戏</button>
+            <p style="margin-top: 20px; color:#aaa;">提示：按住鼠标左键并拖动进行切割！</p>
+        </div>
+    </div>
+    
+    <p style="margin-top: 20px;"><a href="index.html" style="color: #4CAF50;">返回游戏大厅</a></p>
+
+    <script>
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const GAME_DURATION = 300; // 5分钟 * 60秒
+        const GRAVITY = 0.5; // 重力加速度
+        
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const pathCanvas = document.getElementById('knife-path');
+        const pathCtx = pathCanvas.getContext('2d'); // 用于绘制刀光
+        const overlay = document.getElementById('overlay');
+        const startButton = document.getElementById('start-button');
+        const messageDisplay = overlay.querySelector('.message');
+        const scoreDisplay = overlay.querySelector('.score-display');
+        
+        let gameState = 'START'; 
+        let score = 0;
+        let gameTime = 0; 
+        let lastTime = 0;
+        let elements = []; // 包含所有水果和切片的数组
+        let mousePath = []; 
+        
+        // --- 1. 资源管理 (加载所有图片) ---
+        const assets = {};
+        
+        // 确保这些路径和您的文件名完全匹配
+        const IMAGE_SOURCES = {
+            apple: 'images/苹果1.jpg',
+            apple_sliced: 'images/苹果2.jpg',
+            watermelon: 'images/西瓜1.jpg',
+            watermelon_sliced: 'images/西瓜2.jpg',
+            banana: 'images/香蕉1.jpg',
+            banana_sliced: 'images/香蕉2.jpg',
+            bomb: 'images/炸弹1.jpg',
+            bomb_sliced: 'images/炸弹.jpg' // 切开后的炸弹图片
+        };
+
+        let imagesLoaded = 0;
+        const totalImages = Object.keys(IMAGE_SOURCES).length;
+
+        function loadImages() {
+            return new Promise((resolve) => {
+                if (totalImages === 0) {
+                    resolve();
+                    return;
+                }
+                
+                for (const key in IMAGE_SOURCES) {
+                    assets[key] = new Image();
+                    assets[key].onload = () => {
+                        imagesLoaded++;
+                        if (imagesLoaded >= totalImages) {
+                            resolve();
+                        }
+                    };
+                    assets[key].onerror = () => {
+                        console.error(`贴图 ${IMAGE_SOURCES[key]} 加载失败，请检查路径和文件名！`);
+                        imagesLoaded++;
+                        if (imagesLoaded >= totalImages) {
+                            resolve();
+                        }
+                    };
+                    assets[key].src = IMAGE_SOURCES[key];
+                }
+            });
+        }
+        
+        // --- 2. 游戏元素基类 ---
+        
+        class BaseElement {
+            constructor(x, y, radius, type, image) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.type = type;
+                this.image = image;
+                this.vx = 0;
+                this.vy = 0;
+                this.exists = true;
+                this.rotation = 0;
+                this.angularVelocity = 0; // 角速度
+            }
+            
+            update(dt) {
+                if (!this.exists) return;
+
+                const dtRatio = dt / 16;
+                
+                this.vy += GRAVITY * dtRatio;
+                this.x += this.vx * dtRatio;
+                this.y += this.vy * dtRatio;
+                this.rotation += this.angularVelocity * dtRatio;
+
+                // 超出屏幕底部则移除
+                if (this.y > CANVAS_HEIGHT + this.radius * 2) {
+                    this.exists = false;
+                }
+            }
+            
+            draw(context) {
+                if (!this.exists) return;
+                
+                context.save();
+                // 移动和旋转画布中心到元素中心
+                context.translate(this.x, this.y);
+                context.rotate(this.rotation);
+                
+                if (this.image && this.image.complete) {
+                    const size = this.radius * 2;
+                    // 在旋转中心绘制图片 (从 -radius 处开始绘制)
+                    context.drawImage(this.image, -this.radius, -this.radius, size, size);
+                } else {
+                    // 占位符
+                    context.beginPath();
+                    context.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    context.fillStyle = (this.type === 'bomb') ? 'red' : 'yellow';
+                    context.fill();
+                }
+                
+                context.restore();
+            }
+        }
+        
+        // --- 3. 完整水果/炸弹类 ---
+        
+        class Fruit extends BaseElement {
+            constructor(type) {
+                const isBomb = (type === 'bomb');
+                // 炸弹稍微大一点
+                const radius = isBomb ? 35 : 30; 
+                const image = assets[type];
+                
+                const x = Math.random() * CANVAS_WIDTH;
+                const y = CANVAS_HEIGHT + radius;
+                
+                super(x, y, radius, type, image);
+                
+                this.isBomb = isBomb;
+                this.score = this.getScore(type);
+                this.isSliced = false;
+
+                // 初始速度
+                const centerBias = (CANVAS_WIDTH / 2) - this.x; 
+                this.vx = (Math.random() * 5 + 2) * Math.sign(centerBias || (Math.random() - 0.5));
+                this.vy = -(Math.random() * 8 + 15);
+                
+                // 初始旋转 (中等角速度)
+                this.angularVelocity = (Math.random() - 0.5) * 0.1; 
+            }
+
+            getScore(type) {
+                switch (type) {
+                    case 'apple': return 10;
+                    case 'banana': return 15;
+                    case 'watermelon': return 25;
+                    case 'bomb': return 0;
+                    default: return 5;
+                }
+            }
+        }
+        
+        // --- 4. 被切开的碎片类 ---
+        
+        class SlicedFruitPiece extends BaseElement {
+            constructor(originalFruit, side) {
+                const image = assets[`${originalFruit.type}_sliced`];
+                
+                super(originalFruit.x, originalFruit.y, originalFruit.radius, originalFruit.type, image);
+                
+                // 继承原始速度
+                this.vx = originalFruit.vx;
+                this.vy = originalFruit.vy;
+                
+                // 施加更快的角速度，模拟被切开后飞溅和旋转
+                this.angularVelocity = (Math.random() * 0.4 + 0.1) * (side === 'left' ? -1 : 1);
+                
+                // 施加分离力，让两个半片飞开
+                const separationForce = 3;
+                if (side === 'left') {
+                    this.vx -= separationForce;
+                } else {
+                    this.vx += separationForce;
+                }
+            }
+        }
+
+        // --- 5. 游戏主逻辑 ---
+        
+        let spawnTimer = 0;
+        let spawnInterval = 1000; 
+
+        function spawnFruit(dt) {
+            spawnTimer += dt;
+            
+            // 难度递增: 游戏时间越长，生成间隔越短 (最小 300ms)
+            const timeFactor = Math.min(gameTime / (GAME_DURATION * 0.8), 1);
+            spawnInterval = 1000 - timeFactor * 700; 
+
+            if (spawnTimer >= spawnInterval) {
+                spawnTimer = 0;
+                
+                const fruitTypes = ['apple', 'banana', 'watermelon'];
+                let type;
+                // 10% 概率生成炸弹
+                if (Math.random() < 0.1) { 
+                    type = 'bomb';
+                } else {
+                    type = fruitTypes[Math.floor(Math.random() * fruitTypes.length)];
+                }
+
+                elements.push(new Fruit(type));
+            }
+        }
+
+        // 复杂的线段-圆形碰撞检测 (几何辅助函数)
+        function lineCircleCollision(p1, p2, cx, cy, radius) {
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const acx = cx - p1.x;
+            const acy = cy - p1.y;
+            
+            // 投影长度 t (t in [0, 1] means collision point on line segment)
+            let t = (acx * dx + acy * dy) / (dx * dx + dy * dy);
+            t = Math.max(0, Math.min(1, t));
+
+            // 最近点 P (在线段上)
+            const nearestX = p1.x + t * dx;
+            const nearestY = p1.y + t * dy;
+
+            // 距离平方
+            const distSq = (cx - nearestX) * (cx - nearestX) + (cy - nearestY) * (cy - nearestY);
+
+            return distSq <= radius * radius;
+        }
+
+
+        function checkCollision() {
+            if (mousePath.length < 2) return;
+
+            const p1 = mousePath[mousePath.length - 2]; 
+            const p2 = mousePath[mousePath.length - 1]; 
+            
+            // 遍历所有完整的水果进行碰撞检测
+            for (let i = elements.length - 1; i >= 0; i--) {
+                const element = elements[i];
+                // 只检查未被切开的 Fruit 实例
+                if (!(element instanceof Fruit) || element.isSliced) continue;
+
+                if (lineCircleCollision(p1, p2, element.x, element.y, element.radius)) {
+                    element.isSliced = true; 
+                    element.exists = false; // 隐藏完整水果
+                    
+                    if (element.isBomb) {
+                        // 炸弹：生成爆炸视觉效果并结束游戏
+                        endGame('💥 糟糕！切到了炸弹！');
+                        return;
+                    } else {
+                        // 水果：生成两个切片
+                        score += element.score;
+                        elements.push(new SlicedFruitPiece(element, 'left'));
+                        elements.push(new SlicedFruitPiece(element, 'right'));
+                    }
+                }
+            }
+        }
+
+        function update(dt) {
+            if (gameState !== 'PLAYING') return;
+
+            // 1. 计时器更新
+            gameTime += dt / 1000;
+            if (gameTime >= GAME_DURATION) {
+                gameState = 'END';
+                endGame('⌚ 时间到！');
+                return;
+            }
+
+            // 2. 水果生成
+            spawnFruit(dt);
+
+            // 3. 碰撞检测 (每次鼠标移动都会触发)
+            checkCollision();
+            
+            // 4. 所有元素状态更新
+            elements.forEach(el => el.update(dt));
+
+            // 5. 移除已消失的元素
+            elements = elements.filter(el => el.exists);
+
+            // 6. 限制鼠标路径长度
+            if (mousePath.length > 5) { 
+                mousePath.shift();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // 1. 绘制所有元素
+            elements.forEach(el => el.draw(ctx));
+
+            // 2. 绘制刀光
+            pathCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            if (mousePath.length > 1) {
+                pathCtx.beginPath();
+                pathCtx.moveTo(mousePath[0].x, mousePath[0].y);
+                
+                for (let i = 1; i < mousePath.length; i++) {
+                    pathCtx.lineTo(mousePath[i].x, mousePath[i].y);
+                }
+                
+                // 刀光样式
+                pathCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                pathCtx.lineWidth = 5;
+                pathCtx.lineCap = 'round';
+                pathCtx.stroke();
+            }
+
+            // 3. 绘制 HUD
+            const timeLeft = Math.max(0, GAME_DURATION - Math.floor(gameTime));
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`得分: ${score}`, 10, 30);
+            ctx.textAlign = 'right';
+            ctx.fillText(`时间: ${timeStr}`, CANVAS_WIDTH - 10, 30);
+        }
+
+        function loop(timestamp) {
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            if (gameState === 'PLAYING') {
+                requestAnimationFrame(loop);
+            }
+        }
+        
+        // --- 6. 游戏状态控制 ---
+        
+        function startGame() {
+            score = 0;
+            gameTime = 0;
+            elements = [];
+            mousePath = [];
+            gameState = 'PLAYING';
+            overlay.style.display = 'none';
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function endGame(message) {
+            gameState = 'END';
+            overlay.style.display = 'flex';
+            startButton.textContent = '再玩一次';
+            messageDisplay.textContent = message;
+            scoreDisplay.textContent = `最终得分: ${score}`;
+        }
+        
+        // --- 7. 输入处理 ---
+        
+        let isDrawing = false;
+        
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (gameState === 'PLAYING') {
+                isDrawing = true;
+                mousePath = []; 
+                mousePath.push(getMousePos(e));
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing && gameState === 'PLAYING') {
+                const pos = getMousePos(e);
+                mousePath.push(pos);
+                checkCollision(); // 每次移动都检测碰撞
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+        canvas.addEventListener('mouseleave', () => {
+            isDrawing = false;
+        });
+
+        // --- 8. 初始化 ---
+        
+        startButton.addEventListener('click', startGame);
+
+        messageDisplay.textContent = '正在加载资源...';
+        loadImages().then(() => {
+            messageDisplay.textContent = '准备就绪';
+            startButton.style.display = 'block';
+            draw(); 
+        });
+    </script>
+</body>
+</html>
