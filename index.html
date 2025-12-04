@@ -15,7 +15,7 @@
             min-height: 100vh;
             margin: 0;
             background-color: #333; /* 暗色背景 */
-            font-family: 'Arial', sans-serif; /* 实际项目中应使用像素字体 */
+            font-family: monospace, sans-serif; /* 简单的像素风格字体 */
             color: white;
             flex-direction: column;
         }
@@ -40,7 +40,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(0, 0, 0, 0.9);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -52,6 +52,7 @@
         #info-panel h1 {
             color: yellow;
             font-size: 2.5em;
+            text-shadow: 2px 2px #000;
         }
 
         #start-button {
@@ -76,6 +77,16 @@
             border: 1px solid #555;
             word-break: break-all;
         }
+
+        #share-url input {
+            width: 90%;
+            padding: 5px;
+            margin-top: 5px;
+            border: none;
+            background: #444;
+            color: white;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -86,10 +97,10 @@
         <div id="info-panel">
             <h1>像素跳跃大冒险</h1>
             <p>操作：方向键/WASD移动，空格/上键跳跃。</p>
-            <p>目标：收集所有金币，击败Boss，进入下一个关卡！</p>
+            <p>目标：收集金币，躲避障碍，找到出口！</p>
             <p>当前关卡: <span id="current-level-display">1 / 6</span></p>
             <button id="start-button">开始游戏</button>
-            <div id="share-url">分享链接: (游戏状态准备好后将在此显示)</div>
+            <div id="share-url">分享链接: (游戏开始后，您的专属分享链接将在此生成)</div>
         </div>
     </div>
 
@@ -102,7 +113,7 @@
         const GAME_HEIGHT = canvas.height;
 
         // --- 游戏配置 ---
-        const TILE_SIZE = 32; // 像素风格常用的瓦片大小
+        const TILE_SIZE = 32; // 像素风格瓦片大小
         const GRAVITY = 0.6;
         const JUMP_POWER = -12;
         const PLAYER_SPEED = 5;
@@ -118,53 +129,100 @@
             velY: 0,
             onGround: false,
             score: 0,
-            lives: 3
+            lives: 3,
+            canDoubleJump: false, // 道具效果
+            usedDoubleJump: false
         };
 
-        // 基础关卡数据 (简化示例，实际应更复杂)
+        // 基础关卡数据 (包含6个关卡，玩法逐渐复杂)
         const levels = [
-            // Level 1: 简单的平台
+            // Level 1: 简单的平台和金币
             [
                 { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE }, // 地面
                 { type: 'platform', x: 200, y: 350, width: 100, height: TILE_SIZE },
-                { type: 'coin', x: 250, y: 300 },
-                { type: 'exit', x: 600, y: 448 - 64 } // 关卡出口
+                { type: 'coin', x: 250, y: 300, width: TILE_SIZE, height: TILE_SIZE },
+                { type: 'coin', x: 100, y: 416, width: TILE_SIZE, height: TILE_SIZE },
+                { type: 'exit', x: 600, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
             ],
-            // Level 2: 更多挑战... (省略)
-            [],
-            [],
-            [],
-            [],
-            []
+            // Level 2: 尖刺和二段跳道具
+            [
+                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
+                { type: 'platform', x: 400, y: 300, width: 100, height: TILE_SIZE },
+                { type: 'spike', x: 100, y: 448 - 16, width: TILE_SIZE * 2, height: 16 }, // 尖刺 (在地面上)
+                { type: 'spike', x: 500, y: 448 - 16, width: TILE_SIZE, height: 16 }, 
+                { type: 'powerup_doublejump', x: 430, y: 250, width: TILE_SIZE, height: TILE_SIZE }, // 二段跳道具
+                { type: 'exit', x: 50, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
+            ],
+            // Level 3: 移动平台和简单敌人
+            [
+                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
+                { type: 'platform_moving', x: 100, y: 300, width: 100, height: TILE_SIZE, startX: 100, endX: 350, speed: 1.5 }, // 移动平台
+                { type: 'enemy_walker', x: 450, y: 448 - TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, speed: 1, range: 100, startX: 450 }, // 移动敌人
+                { type: 'coin', x: 200, y: 250, width: TILE_SIZE, height: TILE_SIZE },
+                { type: 'exit', x: 600, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
+            ],
+            // Level 4: 垂直平台跳跃 (平台更高)
+            [
+                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
+                { type: 'platform', x: 50, y: 380, width: 80, height: TILE_SIZE },
+                { type: 'platform', x: 150, y: 310, width: 80, height: TILE_SIZE },
+                { type: 'platform', x: 250, y: 240, width: 80, height: TILE_SIZE },
+                { type: 'spike', x: 350, y: 448 - 16, width: TILE_SIZE * 2, height: 16 }, 
+                { type: 'enemy_walker', x: 400, y: 240 - TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, speed: 0.8, range: 50, startX: 400 },
+                { type: 'coin', x: 280, y: 190, width: TILE_SIZE, height: TILE_SIZE },
+                { type: 'exit', x: 550, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
+            ],
+            // Level 5: 更多敌人和陷阱
+            [
+                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
+                { type: 'enemy_walker', x: 50, y: 448 - TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, speed: 1.5, range: 50, startX: 50 },
+                { type: 'spike', x: 200, y: 448 - 16, width: TILE_SIZE, height: 16 },
+                { type: 'platform', x: 300, y: 350, width: 150, height: TILE_SIZE },
+                { type: 'enemy_walker', x: 350, y: 350 - TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, speed: 1.2, range: 40, startX: 350 },
+                { type: 'coin', x: 380, y: 300, width: TILE_SIZE, height: TILE_SIZE },
+                { type: 'exit', x: 600, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
+            ],
+            // Level 6: 最终挑战
+            [
+                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
+                { type: 'platform_moving', x: 50, y: 350, width: 80, height: TILE_SIZE, startX: 50, endX: 250, speed: 2 },
+                { type: 'platform_moving', x: 350, y: 250, width: 80, height: TILE_SIZE, startX: 350, endX: 550, speed: 2 },
+                { type: 'spike', x: 280, y: 448 - 16, width: TILE_SIZE * 3, height: 16 }, 
+                { type: 'coin', x: 500, y: 200, width: TILE_SIZE, height: TILE_SIZE },
+                { type: 'exit', x: 60, y: 200 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
+            ]
         ];
         let currentLevelIndex = 0;
         let currentLevel = levels[currentLevelIndex];
-
+        
         // -------------------------------------
-        // 3. 玩法丰富多彩的实现点 (TODOs)
-        // -------------------------------------
-        /*
-        * 1. 障碍物/敌人 (spikes, flying enemies, walking enemies)
-        * 2. 道具 (power-ups: double jump, invincibility)
-        * 3. 隐藏区域/秘密 (breakable blocks)
-        * 4. 动态平台 (moving platforms, disappearing platforms)
-        * 5. 最终Boss (Level 6)
-        */
-
-        // -------------------------------------
-        // 4. 事件监听 (输入处理)
+        // 3. 事件监听 (输入处理)
         // -------------------------------------
         const keys = {};
         window.addEventListener('keydown', (e) => {
-            keys[e.key] = true;
+            keys[e.key.toLowerCase()] = true; // 统一转小写处理 WASD
             // 阻止空格键触发页面滚动
             if (e.key === ' ' && gameState === 'PLAYING') {
                 e.preventDefault();
             }
         });
         window.addEventListener('keyup', (e) => {
-            keys[e.key] = false;
+            keys[e.key.toLowerCase()] = false;
         });
+
+        // -------------------------------------
+        // 4. 辅助函数
+        // -------------------------------------
+
+        // 简单的AABB碰撞检测
+        function checkCollision(objA, objB) {
+            return (
+                objA.x < objB.x + objB.width &&
+                objA.x + objA.width > objB.x &&
+                objA.y < objB.y + objB.height &&
+                objA.y + objA.height > objB.y
+            );
+        }
 
         // -------------------------------------
         // 5. 游戏逻辑函数
@@ -176,20 +234,48 @@
             ctx.fillStyle = '#1e90ff'; // 天空蓝
             ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-            // 绘制当前关卡元素 (平台, 金币, 出口)
+            // 绘制当前关卡元素
             currentLevel.forEach(obj => {
-                if (obj.type === 'platform') {
-                    ctx.fillStyle = '#654321'; // 棕色平台
+                // 绘制平台和移动平台
+                if (obj.type.startsWith('platform')) {
+                    ctx.fillStyle = '#654321'; // 棕色
                     ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
-                } else if (obj.type === 'coin') {
-                    // 绘制一个简单的黄色金币 (实际应使用图片)
+                } 
+                // 绘制金币
+                else if (obj.type === 'coin') {
                     ctx.fillStyle = 'yellow';
                     ctx.beginPath();
                     ctx.arc(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
                     ctx.fill();
-                } else if (obj.type === 'exit') {
+                } 
+                // 绘制出口
+                else if (obj.type === 'exit') {
                     ctx.fillStyle = 'lime'; // 绿色出口
-                    ctx.fillRect(obj.x, obj.y, TILE_SIZE, TILE_SIZE * 2);
+                    ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                }
+                // 绘制尖刺
+                else if (obj.type === 'spike') {
+                    ctx.fillStyle = '#999'; // 灰色尖刺
+                    ctx.beginPath();
+                    // 假设尖刺底部在 obj.y + obj.height
+                    ctx.moveTo(obj.x, obj.y + obj.height);
+                    ctx.lineTo(obj.x + obj.width / 2, obj.y);
+                    ctx.lineTo(obj.x + obj.width, obj.y + obj.height);
+                    ctx.closePath();
+                    ctx.fill();
+                } 
+                // 绘制二段跳道具
+                else if (obj.type === 'powerup_doublejump') {
+                    ctx.fillStyle = 'cyan'; // 青色道具
+                    ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                    ctx.fillStyle = 'black';
+                    ctx.font = '10px monospace';
+                    ctx.fillText('DJ', obj.x + 8, obj.y + 20); 
+                }
+                // 绘制敌人
+                else if (obj.type === 'enemy_walker') {
+                    ctx.fillStyle = 'purple'; // 紫色敌人
+                    ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
                 }
             });
 
@@ -202,54 +288,95 @@
         function update() {
             if (gameState !== 'PLAYING') return;
 
+            // --- 移动平台逻辑 ---
+            currentLevel.forEach(obj => {
+                if (obj.type === 'platform_moving') {
+                    if (!obj.direction) obj.direction = 1; // 1: 右移, -1: 左移
+                    
+                    const oldX = obj.x;
+                    obj.x += obj.speed * obj.direction;
+
+                    // 边界反转
+                    if (obj.x >= obj.endX) {
+                        obj.direction = -1;
+                    } else if (obj.x <= obj.startX) {
+                        obj.direction = 1;
+                    }
+
+                    // 玩家随平台移动 (简单实现)
+                    if (player.onGround && player.x + player.width > oldX && player.x < oldX + obj.width && player.y + player.height === obj.y) {
+                        player.x += obj.x - oldX;
+                    }
+                }
+            });
+
+            // --- 敌人移动逻辑 ---
+            currentLevel.forEach(obj => {
+                if (obj.type === 'enemy_walker') {
+                    if (!obj.direction) obj.direction = 1; 
+
+                    obj.x += obj.speed * obj.direction;
+
+                    // 范围限制
+                    if (obj.x >= obj.startX + obj.range) {
+                        obj.direction = -1;
+                    } else if (obj.x <= obj.startX) { // 敌人回到起始点 (简化逻辑)
+                        obj.direction = 1;
+                    }
+                }
+            });
+            
             // --- 玩家输入和水平移动 ---
             player.velX = 0;
-            if (keys['ArrowLeft'] || keys['a']) {
+            if (keys['arrowleft'] || keys['a']) {
                 player.velX = -PLAYER_SPEED;
             }
-            if (keys['ArrowRight'] || keys['d']) {
+            if (keys['arrowright'] || keys['d']) {
                 player.velX = PLAYER_SPEED;
             }
 
             // --- 重力和垂直移动 ---
             player.velY += GRAVITY;
-            // 限制最大下落速度，防止穿透
             if (player.velY > 15) player.velY = 15;
 
-            // 跳跃
-            if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && player.onGround) {
-                player.velY = JUMP_POWER;
-                player.onGround = false;
-                keys[' '] = false; // 消费跳跃输入
+            // 跳跃/二段跳
+            if (keys['arrowup'] || keys['w'] || keys[' ']) {
+                if (player.onGround) {
+                    player.velY = JUMP_POWER;
+                    player.onGround = false;
+                    player.usedDoubleJump = false; // 重置二段跳使用状态
+                } else if (player.canDoubleJump && !player.usedDoubleJump) {
+                    player.velY = JUMP_POWER * 0.8; // 二段跳稍弱
+                    player.usedDoubleJump = true;
+                }
+                keys[' '] = false; // 消费跳跃输入，避免持续按住一直跳
+                keys['arrowup'] = false; 
+                keys['w'] = false;
             }
 
-            // 更新位置 (X轴)
+            // 更新位置
             player.x += player.velX;
+            
             // 边界检查 (X轴)
             if (player.x < 0) player.x = 0;
             if (player.x + player.width > GAME_WIDTH) player.x = GAME_WIDTH - player.width;
-
-            // 碰撞检测 (X轴) - **TODO: 需要实现碰撞逻辑**
 
             // 更新位置 (Y轴)
             player.y += player.velY;
             player.onGround = false;
 
-            // 碰撞检测 (Y轴) - **TODO: 需要实现碰撞逻辑**
+            // -----------------------------------------------------
+            // 平台碰撞检测 (Y轴)
+            // -----------------------------------------------------
             currentLevel.forEach(obj => {
-                if (obj.type === 'platform') {
-                    // 假设一个简单的矩形碰撞检测
-                    if (
-                        player.x < obj.x + obj.width &&
-                        player.x + player.width > obj.x &&
-                        player.y + player.height > obj.y &&
-                        player.y < obj.y + obj.height
-                    ) {
+                if (obj.type.startsWith('platform')) {
+                    if (checkCollision(player, obj)) {
                         // 如果是从上方落下
                         if (player.velY > 0 && player.y + player.height - player.velY <= obj.y) {
                             player.y = obj.y - player.height;
                             player.velY = 0;
                             player.onGround = true;
+                            player.usedDoubleJump = false; // 接触地面重置二段跳
                         }
                         // 如果是从下方撞到平台
                         else if (player.velY < 0 && player.y - player.velY >= obj.y + obj.height) {
@@ -260,17 +387,59 @@
                 }
             });
 
+            // -----------------------------------------------------
+            // 收集/伤害/过关 碰撞检测
+            // -----------------------------------------------------
+            let nextLevel = false; 
+
+            currentLevel = currentLevel.filter(obj => {
+                if (checkCollision(player, obj)) {
+                    if (obj.type === 'coin') {
+                        player.score += 10;
+                        return false; // 移除金币
+                    } 
+                    else if (obj.type === 'powerup_doublejump') {
+                        player.canDoubleJump = true;
+                        alert("获得二段跳能力！");
+                        return false; // 移除道具
+                    }
+                    else if (obj.type === 'spike' || obj.type === 'enemy_walker') {
+                        // 伤害/死亡
+                        player.lives--;
+                        resetPlayer(); 
+                        return true; // 伤害性物体不移除
+                    }
+                    else if (obj.type === 'exit') {
+                        nextLevel = true; // 准备进入下一关
+                        return true; // 出口不移除
+                    }
+                }
+                return true; // 其他物体保留
+            });
+
             // 边界检查 (Y轴) - 掉出屏幕即死亡
             if (player.y > GAME_HEIGHT) {
-                resetPlayer();
                 player.lives--;
+                resetPlayer();
             }
 
-            // 收集金币和关卡出口 (TODO: 碰撞检测和状态更新)
-            // ... (遍历 currentLevel 检查与 player 的重叠)
-
-            // 更新HUD
-            updateHUD();
+            // -----------------------------------------------------
+            // 关卡切换逻辑
+            // -----------------------------------------------------
+            if (nextLevel) {
+                if (currentLevelIndex < levels.length - 1) {
+                    currentLevelIndex++;
+                    currentLevel = levels[currentLevelIndex];
+                    resetPlayer(); 
+                    player.canDoubleJump = false; // 道具状态在新关卡重置
+                    player.usedDoubleJump = false;
+                } else {
+                    // 恭喜通关！
+                    gameState = 'WIN';
+                    document.getElementById('info-panel').style.display = 'flex';
+                    document.getElementById('info-panel').innerHTML = '<h1>恭喜！通关！</h1><p>最终得分: ' + player.score + '</p><button onclick="resetGame()">重新开始</button>';
+                }
+            }
 
             // 检查游戏结束/胜利条件
             if (player.lives <= 0) {
@@ -278,15 +447,20 @@
                 document.getElementById('info-panel').style.display = 'flex';
                 document.getElementById('info-panel').innerHTML = '<h1>游戏结束!</h1><p>得分: ' + player.score + '</p><button onclick="resetGame()">重新开始</button>';
             }
+
+            // 更新HUD
+            updateHUD();
         }
 
-        // 重置玩家状态（死亡/掉落后）
+        // 重置玩家状态（死亡/掉落后或进入新关卡）
         function resetPlayer() {
+            // 简单地重置到起点附近
             player.x = 50;
             player.y = 50;
             player.velX = 0;
             player.velY = 0;
             player.onGround = false;
+            player.usedDoubleJump = false; // 重置二段跳的使用
         }
 
         // 更新屏幕上的得分和生命显示
@@ -308,11 +482,12 @@
         // -------------------------------------
 
         /**
-         * 编码游戏状态到URL参数 (Level 3/Score 150) -> ?l=3&s=150
-         * 实际应用中可以包含更复杂的配置，例如已解锁的道具。
+         * 编码游戏状态到URL参数 (Level, Score, Lives, DoubleJumpStatus)
          */
         function encodeGameState() {
-            return `l=${currentLevelIndex + 1}&s=${player.score}&li=${player.lives}`;
+            // 0/1 表示 boolean 状态
+            const dj = player.canDoubleJump ? 1 : 0; 
+            return `l=${currentLevelIndex + 1}&s=${player.score}&li=${player.lives}&dj=${dj}`;
         }
 
         /**
@@ -323,20 +498,21 @@
             const level = parseInt(urlParams.get('l'));
             const score = parseInt(urlParams.get('s'));
             const lives = parseInt(urlParams.get('li'));
+            const dj = parseInt(urlParams.get('dj'));
 
-            if (level && level >= 1 && level <= 6) {
+            if (level && level >= 1 && level <= levels.length) {
                 currentLevelIndex = level - 1;
                 currentLevel = levels[currentLevelIndex];
                 resetPlayer();
-                console.log(`从URL加载关卡: ${level}`);
             }
             if (!isNaN(score)) {
                 player.score = score;
-                console.log(`从URL加载得分: ${score}`);
             }
             if (!isNaN(lives)) {
                 player.lives = lives;
-                console.log(`从URL加载生命: ${lives}`);
+            }
+            if (!isNaN(dj)) {
+                player.canDoubleJump = (dj === 1);
             }
         }
 
@@ -344,11 +520,12 @@
         function startGame() {
             document.getElementById('info-panel').style.display = 'none';
             gameState = 'PLAYING';
+            
             // 实时更新分享链接，包含当前游戏进度
             const baseUrl = window.location.href.split('?')[0]; // 获取基础URL
             const shareUrl = `${baseUrl}?${encodeGameState()}`;
             document.getElementById('share-url').innerHTML = `分享链接 (复制): <input type="text" value="${shareUrl}" readonly onclick="this.select()">`;
-            // 如果是第一次启动，或者没有从URL加载，则初始化HUD
+            
             updateHUD();
         }
 
@@ -357,9 +534,15 @@
             currentLevel = levels[currentLevelIndex];
             player.score = 0;
             player.lives = 3;
+            player.canDoubleJump = false;
+            player.usedDoubleJump = false;
             resetPlayer();
+            
+            // 重新设置信息面板
             document.getElementById('info-panel').style.display = 'flex';
-            document.getElementById('info-panel').innerHTML = '<h1>像素跳跃大冒险</h1><p>操作：方向键/WASD移动，空格/上键跳跃。</p><p>目标：收集所有金币，击败Boss，进入下一个关卡！</p><p>当前关卡: <span id="current-level-display">1 / 6</span></p><button id="start-button" onclick="startGame()">开始游戏</button><div id="share-url">分享链接: (游戏状态准备好后将在此显示)</div>';
+            document.getElementById('info-panel').innerHTML = '<h1>像素跳跃大冒险</h1><p>操作：方向键/WASD移动，空格/上键跳跃。</p><p>目标：收集金币，躲避障碍，找到出口！</p><p>当前关卡: <span id="current-level-display">1 / 6</span></p><button id="start-button">开始游戏</button><div id="share-url">分享链接: (游戏开始后，您的专属分享链接将在此生成)</div>';
+            document.getElementById('start-button').addEventListener('click', startGame);
+
             gameState = 'START';
             updateHUD();
         }
