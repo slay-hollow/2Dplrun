@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>方块消除 - 推箱子解谜</title>
+    <title>方块消除 - 10 关挑战</title>
     <style>
+        /* CSS 样式保持不变 */
         body {
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #263238; /* 深灰色背景 */
+            background-color: #263238; 
             color: white;
             flex-direction: column;
             font-family: monospace, sans-serif;
@@ -23,7 +24,7 @@
         }
         #game-canvas {
             display: block;
-            background-color: #455a64; /* 游戏区域背景 */
+            background-color: #455a64; 
         }
         #info-panel {
             position: absolute;
@@ -48,7 +49,7 @@
             font-size: 1.2em;
             cursor: pointer;
             margin: 10px;
-            background-color: #ff9800; /* 橙色按钮 */
+            background-color: #ff9800; 
             color: white;
             border: none;
             transition: background-color 0.3s;
@@ -64,7 +65,7 @@
 </head>
 <body>
 
-    <h1>🧱 方块消除 - 推箱子</h1>
+    <h1>🧱 方块消除 - 10 关挑战</h1>
 
     <div id="game-container">
         <canvas id="game-canvas" width="400" height="400"></canvas>
@@ -79,8 +80,8 @@
     </div>
 
     <div class="hud-item">
-        关卡: <span id="level-display">1 / 2</span> | 步数: <span id="moves-display">0</span> 
-        <button id="reset-button" class="control-button" onclick="resetLevel()">重置关卡</button>
+        关卡: <span id="level-display">1 / 10</span> | 步数: <span id="moves-display">0</span> 
+        <button id="reset-button" class="control-button" onclick="resetLevel()">重置关卡 (R)</button>
     </div>
 
     <script>
@@ -92,97 +93,116 @@
         const TILE_SIZE = 40;
         const GRID_SIZE = 10; // 10x10 网格
 
+        // 玩家、箱子和地图状态
         let player = { x: 0, y: 0 };
         let boxes = [];
         let targets = [];
-        let mapData = [];
+        let mapLayout = []; // 只存储墙壁和地板
+        let startPositions = { player: { x: 0, y: 0 }, boxes: [] }; // 用于重置
+
         let currentLevelIndex = 0;
         let moves = 0;
 
-        // --- 关卡数据 ---
-        // 0: 地板 (Floor)
-        // 1: 墙壁 (Wall)
-        // 2: 目标点 (Target)
-        // 3: 玩家起始点 (Player Start)
-        // 4: 箱子起始点 (Box Start)
-        // 注意：玩家和箱子的实际位置存储在 player 和 boxes 数组中
+        // --- 关卡数据 (10 关) ---
+        // 0: 地板, 1: 墙壁, 2: 目标点, 3: 玩家, 4: 箱子
         const levels = [
-            // Level 1: 简单推入
-            [
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                1, 0, 4, 0, 0, 0, 0, 0, 0, 1,
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                1, 0, 3, 0, 0, 0, 0, 2, 2, 1,
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-            ],
-            // Level 2: 稍微复杂
-            [
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 2, 0, 0, 1, 0, 0, 0, 0, 1,
-                1, 0, 4, 0, 1, 0, 4, 0, 0, 1,
-                1, 0, 0, 0, 0, 0, 0, 1, 0, 1,
-                1, 0, 0, 1, 1, 1, 0, 1, 0, 1,
-                1, 0, 0, 0, 0, 1, 0, 1, 0, 1,
-                1, 0, 4, 0, 0, 1, 0, 1, 0, 1,
-                1, 0, 3, 0, 0, 0, 0, 2, 2, 1,
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-            ]
+            // Level 1: 简单推入 (2 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,0,0,0,0,0,0,0,0,1, 1,0,4,0,0,0,0,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,3,0,0,0,0,2,2,1, 1,0,4,0,0,0,0,0,0,1, 1,1,1,1,1,1,1,1,1,1],
+            
+            // Level 2: 墙壁障碍 (2 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,0,0,0,0,0,0,0,0,1, 1,0,4,1,1,1,0,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,0,0,0,1,0,0,0,1, 1,0,0,0,0,1,0,0,0,1, 1,0,3,0,0,0,0,2,2,1, 1,0,4,0,0,0,0,0,0,1, 1,1,1,1,1,1,1,1,1,1],
+
+            // Level 3: 目标点分散 (3 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,2,0,0,0,0,0,0,0,1, 1,0,4,0,0,0,0,0,0,1, 1,0,0,0,0,0,0,1,0,1, 1,0,0,0,0,0,0,1,0,1, 1,0,4,1,1,1,0,1,0,1, 1,0,0,0,0,1,0,0,0,1, 1,0,3,0,0,0,0,0,2,1, 1,0,4,0,0,0,0,0,0,1, 1,1,1,1,1,1,1,1,1,1],
+            
+            // Level 4: 拐角陷阱 (3 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,2,2,0,0,0,0,0,0,1, 1,0,4,0,0,0,0,0,0,1, 1,0,0,1,1,1,1,1,0,1, 1,0,0,1,0,0,0,1,0,1, 1,0,4,1,0,0,0,1,0,1, 1,0,0,1,0,0,0,1,0,1, 1,3,0,1,0,0,0,0,0,1, 1,0,4,0,0,0,0,0,2,1, 1,1,1,1,1,1,1,1,1,1],
+
+            // Level 5: 狭窄通道 (4 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,2,0,4,0,0,0,0,0,1, 1,2,1,0,1,0,1,0,0,1, 1,0,1,4,1,0,1,0,0,1, 1,0,1,0,1,0,1,0,0,1, 1,0,1,0,1,0,1,0,0,1, 1,0,1,4,1,0,1,0,0,1, 1,2,1,0,1,0,1,0,0,1, 1,3,0,4,0,0,0,0,0,1, 1,1,1,1,1,1,1,1,1,1],
+
+            // Level 6: L形推 (3 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,0,0,0,0,0,0,2,1,1, 1,0,4,1,1,1,0,0,0,1, 1,0,0,0,0,1,0,0,0,1, 1,1,1,1,0,1,0,4,0,1, 1,0,0,0,0,1,0,0,0,1, 1,0,4,0,0,1,1,1,0,1, 1,3,0,0,0,0,0,0,2,1, 1,0,0,0,0,0,0,0,2,1, 1,1,1,1,1,1,1,1,1,1],
+
+            // Level 7: 需要反推 (4 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,2,0,0,1,0,0,2,0,1, 1,0,1,0,1,0,0,0,0,1, 1,0,1,4,0,0,0,0,0,1, 1,0,1,0,1,0,0,0,0,1, 1,0,1,4,0,0,0,0,0,1, 1,0,1,0,1,0,0,0,0,1, 1,3,0,4,0,0,0,4,2,1, 1,0,0,0,0,0,0,0,2,1, 1,1,1,1,1,1,1,1,1,1],
+            
+            // Level 8: 目标被堵住 (3 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,0,0,0,0,0,0,0,0,1, 1,0,4,1,1,1,1,0,0,1, 1,0,0,0,0,0,1,0,0,1, 1,0,0,0,0,0,1,2,0,1, 1,0,0,0,0,0,1,2,0,1, 1,0,4,0,0,0,1,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,3,4,0,0,0,0,0,2,1, 1,1,1,1,1,1,1,1,1,1],
+            
+            // Level 9: 复杂通道 (4 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,2,0,0,1,0,0,0,0,1, 1,0,1,0,1,0,1,0,0,1, 1,0,1,4,0,4,1,0,0,1, 1,0,1,0,1,0,1,0,0,1, 1,0,1,0,1,0,1,0,0,1, 1,0,1,4,0,4,1,0,0,1, 1,0,1,0,1,0,1,0,2,1, 1,3,0,0,0,0,0,0,2,1, 1,1,1,1,1,1,1,1,1,1],
+
+            // Level 10: 最终考验 (4 boxes)
+            [1,1,1,1,1,1,1,1,1,1, 1,2,2,0,0,0,0,0,0,1, 1,0,0,0,1,4,1,0,0,1, 1,0,4,0,1,0,1,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,0,0,0,0,0,0,0,1, 1,0,4,0,1,0,1,0,0,1, 1,0,0,0,1,4,1,0,2,1, 1,3,0,0,0,0,0,0,2,1, 1,1,1,1,1,1,1,1,1,1]
         ];
+
 
         // --- 初始化关卡 ---
         function loadLevel(index) {
             currentLevelIndex = index;
-            mapData = levels[index];
+            const levelData = levels[index];
             boxes = [];
             targets = [];
+            startPositions.boxes = [];
+            mapLayout = [];
             moves = 0;
             
-            for (let i = 0; i < mapData.length; i++) {
-                const mapValue = mapData[i];
+            for (let i = 0; i < levelData.length; i++) {
+                const mapValue = levelData[i];
                 const y = Math.floor(i / GRID_SIZE);
                 const x = i % GRID_SIZE;
 
                 if (mapValue === 3) {
-                    player.x = x;
-                    player.y = y;
+                    startPositions.player = { x: x, y: y };
+                    mapLayout.push(0); 
                 } else if (mapValue === 4) {
-                    boxes.push({ x: x, y: y });
+                    startPositions.boxes.push({ x: x, y: y });
+                    mapLayout.push(0); 
                 } else if (mapValue === 2) {
                     targets.push({ x: x, y: y });
+                    mapLayout.push(2); 
+                } else {
+                    mapLayout.push(mapValue); // 墙壁(1)或地板(0)
                 }
             }
+            
+            // 将玩家和箱子重置到起始点
+            player = { ...startPositions.player };
+            // 注意：这里需要深拷贝，防止数组引用导致重置失败
+            boxes = startPositions.boxes.map(box => ({ x: box.x, y: box.y })); 
+            
             updateHUD();
         }
 
+        // 重置当前关卡状态
         function resetLevel() {
-             // 重新加载当前关卡
-             loadLevel(currentLevelIndex);
-             gameState = 'PLAYING';
+            if (gameState === 'WIN') { // 如果在胜利界面，则不响应R键，避免干扰
+                 return;
+            }
+            // 使用存储的起始位置
+            player = { ...startPositions.player };
+            boxes = startPositions.boxes.map(box => ({ x: box.x, y: box.y }));
+            moves = 0;
+            gameState = 'PLAYING';
+            updateHUD();
         }
 
 
         // -------------------------------------
-        // 游戏逻辑：移动和推箱子
+        // 游戏逻辑：移动和推箱子 (核心逻辑)
         // -------------------------------------
         
-        // 检查给定坐标 (x, y) 是否有箱子
         function getBoxIndex(x, y) {
             return boxes.findIndex(box => box.x === x && box.y === y);
         }
         
-        // 检查给定坐标 (x, y) 是否是墙壁
-        function isWall(x, y) {
-            // 边界检查
-            if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return true;
+        function isPassable(x, y) {
+             // 边界检查
+            if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return false;
             // 地图数据检查
             const index = y * GRID_SIZE + x;
-            return mapData[index] === 1;
+            return mapLayout[index] !== 1; // 1 是墙壁，不可通过
         }
 
         // 处理玩家移动
@@ -192,7 +212,7 @@
             const newX = player.x + dx;
             const newY = player.y + dy;
 
-            if (isWall(newX, newY)) {
+            if (!isPassable(newX, newY)) {
                 return; // 撞墙，不动
             }
 
@@ -203,8 +223,9 @@
                 const boxNewX = newX + dx;
                 const boxNewY = newY + dy;
 
-                if (isWall(boxNewX, boxNewY) || getBoxIndex(boxNewX, boxNewY) !== -1) {
-                    return; // 推动失败：前面是墙或另一个箱子
+                // 检查箱子前面是否可通行（非墙壁且没有其他箱子）
+                if (!isPassable(boxNewX, boxNewY) || getBoxIndex(boxNewX, boxNewY) !== -1) {
+                    return; // 推动失败
                 }
 
                 // 推动成功
@@ -222,32 +243,25 @@
             checkWinCondition();
         }
 
-        // 检查胜利条件
+        // 检查胜利条件 (确保所有箱子都在目标点上)
         function checkWinCondition() {
-            let boxesOnTarget = 0;
-            
             if (targets.length === 0) return;
 
-            boxes.forEach(box => {
-                const isOnTarget = targets.some(target => target.x === box.x && target.y === box.y);
-                if (isOnTarget) {
-                    boxesOnTarget++;
-                }
+            let allBoxesOnTarget = boxes.every(box => {
+                return targets.some(target => target.x === box.x && target.y === box.y);
             });
 
-            if (boxesOnTarget === targets.length) {
-                // 胜利！
+            if (allBoxesOnTarget) {
                 gameState = 'WIN';
                 setTimeout(showWinScreen, 50); 
             }
         }
         
         // -------------------------------------
-        // 渲染和事件
+        // 渲染、HUD 和流程控制
         // -------------------------------------
 
         function draw() {
-            // 清除画布
             ctx.fillStyle = '#455a64';
             ctx.fillRect(0, 0, GAME_SIZE, GAME_SIZE);
             
@@ -262,26 +276,25 @@
                 ctx.stroke();
             }
 
-            // 绘制地图元素 (墙壁/目标点)
-            for (let i = 0; i < mapData.length; i++) {
-                const mapValue = mapData[i];
-                const y = Math.floor(i / GRID_SIZE);
-                const x = i % GRID_SIZE;
-
+            // 绘制地图元素 (墙壁)
+            for (let i = 0; i < mapLayout.length; i++) {
+                const mapValue = mapLayout[i];
                 if (mapValue === 1) { // 墙壁
+                    const y = Math.floor(i / GRID_SIZE);
+                    const x = i % GRID_SIZE;
                     ctx.fillStyle = '#37474f';
                     ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                 }
             }
 
-            // 绘制目标点 (在墙壁之上，箱子之下)
+            // 绘制目标点
             targets.forEach(target => {
-                ctx.fillStyle = 'rgba(255, 165, 0, 0.5)'; // 透明橙色
+                ctx.fillStyle = 'rgba(255, 165, 0, 0.5)'; 
                 ctx.beginPath();
                 ctx.arc(target.x * TILE_SIZE + TILE_SIZE / 2, target.y * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
                 ctx.fill();
                 
-                ctx.fillStyle = '#ffeb3b'; // 目标符号 🎯
+                ctx.fillStyle = '#ffeb3b'; 
                 ctx.font = `${TILE_SIZE * 0.7}px monospace`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -292,21 +305,21 @@
             boxes.forEach(box => {
                 let isOnTarget = targets.some(target => target.x === box.x && target.y === box.y);
                 
-                ctx.fillStyle = isOnTarget ? '#00e676' : '#9e9e9e'; // 绿色表示到位
+                ctx.fillStyle = isOnTarget ? '#00e676' : '#9e9e9e'; 
                 ctx.fillRect(box.x * TILE_SIZE + 5, box.y * TILE_SIZE + 5, TILE_SIZE - 10, TILE_SIZE - 10);
                 
-                ctx.fillStyle = '#000'; // 箱子符号 📦
+                ctx.fillStyle = '#000'; 
                 ctx.font = `${TILE_SIZE * 0.6}px monospace`;
                 ctx.fillText('📦', box.x * TILE_SIZE + TILE_SIZE / 2, box.y * TILE_SIZE + TILE_SIZE / 2);
             });
             
             // 绘制玩家
-            ctx.fillStyle = '#64b5f6'; // 蓝色玩家
+            ctx.fillStyle = '#64b5f6'; 
             ctx.beginPath();
             ctx.arc(player.x * TILE_SIZE + TILE_SIZE / 2, player.y * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 2 - 5, 0, Math.PI * 2);
             ctx.fill();
             
-            ctx.fillStyle = '#000'; // 玩家符号 🏃
+            ctx.fillStyle = '#000'; 
             ctx.font = `${TILE_SIZE * 0.7}px monospace`;
             ctx.fillText('🏃', player.x * TILE_SIZE + TILE_SIZE / 2, player.y * TILE_SIZE + TILE_SIZE / 2);
         }
@@ -321,10 +334,6 @@
             requestAnimationFrame(loop);
         }
 
-        // -------------------------------------
-        // 界面和流程控制
-        // -------------------------------------
-
         function showWinScreen() {
             document.getElementById('info-panel').style.display = 'flex';
             
@@ -333,24 +342,23 @@
                 // 进入下一关
                 content = `
                     <h1>恭喜通过第 ${currentLevelIndex + 1} 关!</h1>
-                    <p>总步数: ${moves}</p>
+                    <p>步数: ${moves}</p>
                     <button id="next-level-button" class="control-button">进入下一关</button>
                     <p class="hud-item"><a href="index.html" style="color: #64b5f6;">返回游戏大厅</a></p>
                 `;
+                document.getElementById('info-panel').innerHTML = content;
+                // 绑定下一关按钮事件
+                document.getElementById('next-level-button').addEventListener('click', () => startGame(currentLevelIndex + 1));
+
             } else {
                 // 全部通关
                 content = `
                     <h1>🎉 恭喜！您是解谜大师！</h1>
-                    <p>所有关卡完成。</p>
-                    <button id="restart-button" class="control-button" onclick="startGame(0)">重新开始</button>
+                    <p>所有 ${levels.length} 个关卡完成！</p>
+                    <button id="restart-button" class="control-button" onclick="startGame(0)">重新开始挑战</button>
                     <p class="hud-item"><a href="index.html" style="color: #64b5f6;">返回游戏大厅</a></p>
                 `;
-            }
-
-            document.getElementById('info-panel').innerHTML = content;
-            
-            if (currentLevelIndex < levels.length - 1) {
-                document.getElementById('next-level-button').addEventListener('click', () => startGame(currentLevelIndex + 1));
+                document.getElementById('info-panel').innerHTML = content;
             }
         }
         
@@ -367,7 +375,11 @@
         window.addEventListener('keydown', (e) => {
             if (gameState !== 'PLAYING') return;
 
-            e.preventDefault();
+            // 阻止浏览器默认行为，如页面滚动
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 's', 'a', 'd'].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
+
             let dx = 0;
             let dy = 0;
 
@@ -390,7 +402,7 @@
                     break;
                 case 'r': // R 键快速重置
                     resetLevel();
-                    break;
+                    return;
                 default:
                     return;
             }
