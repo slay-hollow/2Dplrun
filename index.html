@@ -32,6 +32,15 @@
             margin: 0 auto;
             padding-bottom: 40px;
         }
+        
+        /* 新增样式：用于包裹单独一行的 Game 7 */
+        #single-game-row {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-top: 20px;
+            display: flex; /* 使用 flexbox 确保居中 */
+            justify-content: center;
+        }
 
         .game-card {
             background-color: #ffffff;
@@ -44,6 +53,9 @@
             display: flex;
             flex-direction: column;
             text-align: left;
+            /* 确保 Game 7 的卡片宽度适应 */
+            width: 100%; 
+            max-width: 300px; 
         }
 
         .game-card:hover {
@@ -71,7 +83,7 @@
             color: #555;
             line-height: 1.6;
         }
-        
+         
         .game-status {
             font-size: 0.9em;
             padding: 5px 10px;
@@ -82,6 +94,12 @@
         .status-complete {
             background-color: #a7f3d0; 
             color: #065f46;
+        }
+        
+        /* 新状态：开发中 */
+        .status-inprogress {
+            background-color: #fcd34d; /* Amber */
+            color: #b45309;
         }
     </style>
 </head>
@@ -150,7 +168,18 @@
                 <p>模拟养成游戏，细心照顾你的小精灵，见证它的成长与进化。</p>
             </div>
         </a>
-        
+    </div>
+
+    <div id="single-game-row">
+        <a href="game712.html" class="game-card">
+            <div class="card-header">
+                <span>Game 7: 大学恋爱物语</span>
+                <span class="game-status status-inprogress">开发中</span>
+            </div>
+            <div class="card-body">
+                <p>文字冒险游戏 (Galgame)，在大学里平衡学业、工作与三段复杂的情感关系，选择你的命运。</p>
+            </div>
+        </a>
     </div>
 
 </body>
