@@ -545,21 +545,26 @@
         }
 
         function resetGame() {
-            currentLevelIndex = 0;
-            currentLevel = levels[currentLevelIndex];
-            player.score = 0;
-            player.lives = 3;
-            player.canDoubleJump = false;
-            player.usedDoubleJump = false;
-            resetPlayer();
-            
-            document.getElementById('info-panel').style.display = 'flex';
-            document.getElementById('info-panel').innerHTML = '<h1>像素跳跃大冒险</h1><p>操作：方向键/WASD移动，空格/上键跳跃。</p><p>目标：收集金币，躲避障碍，找到出口！</p><p>当前关卡: <span id="current-level-display">1 / 6</span></p><button id="start-button">开始游戏</button><div id="share-url">分享链接: (游戏开始后，您的专属分享链接将在此生成)</div>';
-            document.getElementById('start-button').addEventListener('click', startGame);
+    // 1. 重置所有游戏状态变量
+    currentLevelIndex = 0;
+    currentLevel = levels[currentLevelIndex];
+    player.score = 0;
+    player.lives = 3;
+    player.canDoubleJump = false;
+    player.usedDoubleJump = false;
+    resetPlayer();
+    
+    // 2. 重新设置信息面板的 HTML 内容
+    document.getElementById('info-panel').style.display = 'flex';
+    document.getElementById('info-panel').innerHTML = '<h1>像素跳跃大冒险</h1><p>操作：方向键/WASD移动，空格/上键跳跃。</p><p>目标：收集金币，躲避障碍，找到出口！</p><p>当前关卡: <span id="current-level-display">1 / 6</span></p><button id="start-button">开始游戏</button><div id="share-url">分享链接: (游戏开始后，您的专属分享链接将在此生成)</div>';
+    
+    // 3. 关键修复：重新绑定点击事件到新的“开始游戏”按钮上
+    document.getElementById('start-button').addEventListener('click', startGame);
 
-            gameState = 'START';
-            updateHUD();
-        }
+    // 4. 更新游戏状态和显示
+    gameState = 'START';
+    updateHUD();
+}
 
         // --- 初始化流程 ---
         decodeGameState();
