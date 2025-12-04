@@ -3,103 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的独立游戏大厅</title>
+    <title>我的 HTML 小游戏合集</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #2c3e50; /* 深蓝色背景 */
-            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f4f8; /* 浅蓝色背景 */
+            color: #333;
             text-align: center;
-            padding: 50px;
-            min-height: 100vh;
+        }
+
+        h1 {
+            color: #1e3a5f; /* 深蓝色标题 */
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            border-bottom: 3px solid #60a5fa;
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+
+        #game-grid {
+            display: grid;
+            /* 默认两列布局，适应大部分屏幕 */
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-bottom: 40px;
+        }
+
+        .game-card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            text-decoration: none; /* 移除链接下划线 */
+            color: inherit;
             display: flex;
             flex-direction: column;
+            text-align: left;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px); /* 悬停时稍微抬高 */
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-header {
+            background-color: #60a5fa; /* 蓝色头部 */
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.3em;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
         }
-        h1 {
-            color: #ecf0f1;
-            margin-bottom: 40px;
-            font-size: 2.5em;
-        }
-        #game-list {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 30px;
-            max-width: 1000px; /* 调整宽度以适应三个卡片 */
-        }
-        .game-card {
-            background-color: #34495e; /* 稍深的卡片背景 */
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            width: 250px;
+
+        .card-body {
             padding: 20px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            text-decoration: none;
-            color: white;
-            text-align: left;
-            position: relative;
+            flex-grow: 1;
         }
-        .game-card:hover {
-            transform: translateY(-5px); /* 悬停上浮 */
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+
+        .card-body p {
+            color: #555;
+            line-height: 1.6;
         }
-        .game-card h2 {
-            margin-top: 0;
-            color: #f1c40f; /* 醒目黄色标题 */
-            font-size: 1.5em;
-        }
-        .game-card p {
-            font-size: 0.9em;
-            color: #bdc3c7;
-        }
+        
         .game-status {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: #27ae60; /* 绿色标签 */
-            padding: 3px 8px;
+            font-size: 0.9em;
+            padding: 5px 10px;
             border-radius: 5px;
-            font-size: 0.7em;
             font-weight: bold;
+            background-color: #fca5a5; /* 红色标记 */
+            color: #c52323;
+        }
+
+        .status-complete {
+            background-color: #a7f3d0; /* 绿色标记 */
+            color: #065f46;
         }
     </style>
 </head>
 <body>
 
-    <h1>🎮 我的独立游戏大厅</h1>
-    <p>欢迎来到我的网页游戏集！请选择你想挑战的游戏：</p>
+    <h1>🎮 我的 HTML 小游戏世界 🌟</h1>
 
-    <div id="game-list">
-        
+    <div id="game-grid">
+
         <a href="game111.html" class="game-card">
-            <span class="game-status" style="background-color: #27ae60;">已发布</span>
-            <h2>像素跳跃大冒险</h2>
-            <p><strong>文件：</strong> `game111.html`</p>
-            <p><strong>类型：</strong> 2D 平台跳跃</p>
-            <p><strong>特色：</strong> 6 个关卡，重力物理，二段跳道具，可分享进度。</p>
-            <p>点击进入游戏 »</p>
+            <div class="card-header">
+                <span>Game 1: 贪吃蛇</span>
+                <span class="game-status status-complete">完成</span>
+            </div>
+            <div class="card-body">
+                <p>一个经典的街机游戏，控制小蛇吃食物并不断变长，注意不要碰到墙壁或自己的身体。</p>
+            </div>
         </a>
 
         <a href="game211.html" class="game-card">
-            <span class="game-status" style="background-color: #007bff;">V2.0 升级</span>
-            <h2>星际射击 (Space Shooter)</h2>
-            <p><strong>文件：</strong> `game211.html`</p>
-            <p><strong>类型：</strong> 弹幕射击</p>
-            <p><strong>特色：</strong> 视差背景，多种敌人，双发火力道具，分数追踪。</p>
-            <p>点击进入游戏 »</p>
-        </a>
-        
-        <a href="game311.html" class="game-card">
-            <span class="game-status" style="background-color: #00bcd4;">新解谜</span>
-            <h2>方块消除 - 推箱子</h2>
-            <p><strong>文件：</strong> `game311.html`</p>
-            <p><strong>类型：</strong> 逻辑解谜 / 推箱子</p>
-            <p><strong>特色：</strong> 网格移动，墙壁，多个解谜关卡，步数追踪。</p>
-            <p>点击进入游戏 »</p>
+            <div class="card-header">
+                <span>Game 2: 推箱子</span>
+                <span class="game-status status-complete">完成</span>
+            </div>
+            <div class="card-body">
+                <p>一个益智解谜游戏，在复杂的迷宫中，将所有箱子推到目标位置。</p>
+            </div>
         </a>
 
-    </div>
+        <a href="game311.html" class="game-card">
+            <div class="card-header">
+                <span>Game 3: 找茬</span>
+                <span class="game-status status-complete">完成</span>
+            </div>
+            <div class="card-body">
+                <p>在两幅相似的图片中找出所有不同点，考验你的观察力！</p>
+            </div>
+        </a>
+        
+        <a href="game411.html" class="game-card">
+            <div class="card-header">
+                <span>Game 4: 扫雷</span>
+                <span class="game-status status-complete">完成</span>
+            </div>
+            <div class="card-body">
+                <p>经典的 Windows 益智游戏，根据数字提示找出所有地雷的位置。</p>
+            </div>
+        </a>
+
+        <a href="game511.html" class="game-card">
+            <div class="card-header">
+                <span>Game 5: 切水果大师</span>
+                <span class="game-status status-complete">完成</span>
+            </div>
+            <div class="card-body">
+                <p>快速切开飞出的水果，避开炸弹！(您已实现了切片效果)</p>
+            </div>
+        </a>
+
+        <a href="game611.html" class="game-card">
+            <div class="card-header">
+                <span>Game 6: 精灵伙伴养成记</span>
+                <span class="game-status status-complete">完成</span>
+            </div>
+            <div class="card-body">
+                <p>照顾你的小精灵，喂食、玩耍、清洁，看着它从蛋进化到成熟体。</p>
+            </div>
+        </a>
+        
+        </div>
 
 </body>
 </html>
