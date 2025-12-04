@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素跳跃大冒险 - Six Levels</title>
+    <style>
+        /* ------------------------------------- */
+        /* 1. CSS样式：让游戏居中显示并设置像素风字体 */
+        /* ------------------------------------- */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #333; /* 暗色背景 */
+            font-family: 'Arial', sans-serif; /* 实际项目中应使用像素字体 */
+            color: white;
+            flex-direction: column;
+        }
+
+        /* 游戏容器，用于放置画布和界面元素 */
+        #game-container {
+            border: 4px solid #fff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
+            position: relative;
+        }
+
+        /* 游戏画布 - 核心渲染区域 */
+        #game-canvas {
+            display: block; /* 移除画布底部的额外间隙 */
+            image-rendering: pixelated; /* 确保像素风格清晰 */
+        }
+
+        /* 游戏信息面板/开始界面 */
+        #info-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+        }
+
+        #info-panel h1 {
+            color: yellow;
+            font-size: 2.5em;
+        }
+
+        #start-button {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            cursor: pointer;
+            margin-top: 20px;
+            background-color: green;
+            color: white;
+            border: 2px solid white;
+            transition: background-color 0.3s;
+        }
+        #start-button:hover {
+            background-color: darkgreen;
+        }
+
+        #share-url {
+            margin-top: 20px;
+            font-size: 0.9em;
+            padding: 10px;
+            background: #222;
+            border: 1px solid #555;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="game-canvas" width="640" height="480"></canvas>
+
+        <div id="info-panel">
+            <h1>像素跳跃大冒险</h1>
+            <p>操作：方向键/WASD移动，空格/上键跳跃。</p>
+            <p>目标：收集所有金币，击败Boss，进入下一个关卡！</p>
+            <p>当前关卡: <span id="current-level-display">1 / 6</span></p>
+            <button id="start-button">开始游戏</button>
+            <div id="share-url">分享链接: (游戏状态准备好后将在此显示)</div>
+        </div>
+    </div>
+
+    <p>得分: <span id="score-display">0</span> | 生命: <span id="life-display">3</span></p>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const GAME_WIDTH = canvas.width;
+        const GAME_HEIGHT = canvas.height;
+
+        // --- 游戏配置 ---
+        const TILE_SIZE = 32; // 像素风格常用的瓦片大小
+        const GRAVITY = 0.6;
+        const JUMP_POWER = -12;
+        const PLAYER_SPEED = 5;
+        let gameState = 'START'; // START | PLAYING | PAUSED | GAMEOVER | WIN
+
+        // --- 游戏对象状态 ---
+        let player = {
+            x: 50,
+            y: 50,
+            width: TILE_SIZE,
+            height: TILE_SIZE * 1.5,
+            velX: 0,
+            velY: 0,
+            onGround: false,
+            score: 0,
+            lives: 3
+        };
+
+        // 基础关卡数据 (简化示例，实际应更复杂)
+        const levels = [
+            // Level 1: 简单的平台
+            [
+                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE }, // 地面
+                { type: 'platform', x: 200, y: 350, width: 100, height: TILE_SIZE },
+                { type: 'coin', x: 250, y: 300 },
+                { type: 'exit', x: 600, y: 448 - 64 } // 关卡出口
+            ],
+            // Level 2: 更多挑战... (省略)
+            [],
+            [],
+            [],
+            [],
+            []
+        ];
+        let currentLevelIndex = 0;
+        let currentLevel = levels[currentLevelIndex];
+
+        // -------------------------------------
+        // 3. 玩法丰富多彩的实现点 (TODOs)
+        // -------------------------------------
+        /*
+        * 1. 障碍物/敌人 (spikes, flying enemies, walking enemies)
+        * 2. 道具 (power-ups: double jump, invincibility)
+        * 3. 隐藏区域/秘密 (breakable blocks)
+        * 4. 动态平台 (moving platforms, disappearing platforms)
+        * 5. 最终Boss (Level 6)
+        */
+
+        // -------------------------------------
+        // 4. 事件监听 (输入处理)
+        // -------------------------------------
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            // 阻止空格键触发页面滚动
+            if (e.key === ' ' && gameState === 'PLAYING') {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // -------------------------------------
+        // 5. 游戏逻辑函数
+        // -------------------------------------
+
+        // 渲染函数
+        function draw() {
+            // 清除画布
+            ctx.fillStyle = '#1e90ff'; // 天空蓝
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // 绘制当前关卡元素 (平台, 金币, 出口)
+            currentLevel.forEach(obj => {
+                if (obj.type === 'platform') {
+                    ctx.fillStyle = '#654321'; // 棕色平台
+                    ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                } else if (obj.type === 'coin') {
+                    // 绘制一个简单的黄色金币 (实际应使用图片)
+                    ctx.fillStyle = 'yellow';
+                    ctx.beginPath();
+                    ctx.arc(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (obj.type === 'exit') {
+                    ctx.fillStyle = 'lime'; // 绿色出口
+                    ctx.fillRect(obj.x, obj.y, TILE_SIZE, TILE_SIZE * 2);
+                }
+            });
+
+            // 绘制玩家
+            ctx.fillStyle = 'red'; // 红色玩家
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        // 更新函数
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            // --- 玩家输入和水平移动 ---
+            player.velX = 0;
+            if (keys['ArrowLeft'] || keys['a']) {
+                player.velX = -PLAYER_SPEED;
+            }
+            if (keys['ArrowRight'] || keys['d']) {
+                player.velX = PLAYER_SPEED;
+            }
+
+            // --- 重力和垂直移动 ---
+            player.velY += GRAVITY;
+            // 限制最大下落速度，防止穿透
+            if (player.velY > 15) player.velY = 15;
+
+            // 跳跃
+            if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && player.onGround) {
+                player.velY = JUMP_POWER;
+                player.onGround = false;
+                keys[' '] = false; // 消费跳跃输入
+            }
+
+            // 更新位置 (X轴)
+            player.x += player.velX;
+            // 边界检查 (X轴)
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > GAME_WIDTH) player.x = GAME_WIDTH - player.width;
+
+            // 碰撞检测 (X轴) - **TODO: 需要实现碰撞逻辑**
+
+            // 更新位置 (Y轴)
+            player.y += player.velY;
+            player.onGround = false;
+
+            // 碰撞检测 (Y轴) - **TODO: 需要实现碰撞逻辑**
+            currentLevel.forEach(obj => {
+                if (obj.type === 'platform') {
+                    // 假设一个简单的矩形碰撞检测
+                    if (
+                        player.x < obj.x + obj.width &&
+                        player.x + player.width > obj.x &&
+                        player.y + player.height > obj.y &&
+                        player.y < obj.y + obj.height
+                    ) {
+                        // 如果是从上方落下
+                        if (player.velY > 0 && player.y + player.height - player.velY <= obj.y) {
+                            player.y = obj.y - player.height;
+                            player.velY = 0;
+                            player.onGround = true;
+                        }
+                        // 如果是从下方撞到平台
+                        else if (player.velY < 0 && player.y - player.velY >= obj.y + obj.height) {
+                            player.y = obj.y + obj.height;
+                            player.velY = 0;
+                        }
+                    }
+                }
+            });
+
+            // 边界检查 (Y轴) - 掉出屏幕即死亡
+            if (player.y > GAME_HEIGHT) {
+                resetPlayer();
+                player.lives--;
+            }
+
+            // 收集金币和关卡出口 (TODO: 碰撞检测和状态更新)
+            // ... (遍历 currentLevel 检查与 player 的重叠)
+
+            // 更新HUD
+            updateHUD();
+
+            // 检查游戏结束/胜利条件
+            if (player.lives <= 0) {
+                gameState = 'GAMEOVER';
+                document.getElementById('info-panel').style.display = 'flex';
+                document.getElementById('info-panel').innerHTML = '<h1>游戏结束!</h1><p>得分: ' + player.score + '</p><button onclick="resetGame()">重新开始</button>';
+            }
+        }
+
+        // 重置玩家状态（死亡/掉落后）
+        function resetPlayer() {
+            player.x = 50;
+            player.y = 50;
+            player.velX = 0;
+            player.velY = 0;
+            player.onGround = false;
+        }
+
+        // 更新屏幕上的得分和生命显示
+        function updateHUD() {
+            document.getElementById('score-display').textContent = player.score;
+            document.getElementById('life-display').textContent = player.lives;
+            document.getElementById('current-level-display').textContent = (currentLevelIndex + 1) + ' / 6';
+        }
+
+        // 游戏主循环
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // -------------------------------------
+        // 6. 网址分享功能实现
+        // -------------------------------------
+
+        /**
+         * 编码游戏状态到URL参数 (Level 3/Score 150) -> ?l=3&s=150
+         * 实际应用中可以包含更复杂的配置，例如已解锁的道具。
+         */
+        function encodeGameState() {
+            return `l=${currentLevelIndex + 1}&s=${player.score}&li=${player.lives}`;
+        }
+
+        /**
+         * 从URL参数解码游戏状态
+         */
+        function decodeGameState() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const level = parseInt(urlParams.get('l'));
+            const score = parseInt(urlParams.get('s'));
+            const lives = parseInt(urlParams.get('li'));
+
+            if (level && level >= 1 && level <= 6) {
+                currentLevelIndex = level - 1;
+                currentLevel = levels[currentLevelIndex];
+                resetPlayer();
+                console.log(`从URL加载关卡: ${level}`);
+            }
+            if (!isNaN(score)) {
+                player.score = score;
+                console.log(`从URL加载得分: ${score}`);
+            }
+            if (!isNaN(lives)) {
+                player.lives = lives;
+                console.log(`从URL加载生命: ${lives}`);
+            }
+        }
+
+        // 启动游戏
+        function startGame() {
+            document.getElementById('info-panel').style.display = 'none';
+            gameState = 'PLAYING';
+            // 实时更新分享链接，包含当前游戏进度
+            const baseUrl = window.location.href.split('?')[0]; // 获取基础URL
+            const shareUrl = `${baseUrl}?${encodeGameState()}`;
+            document.getElementById('share-url').innerHTML = `分享链接 (复制): <input type="text" value="${shareUrl}" readonly onclick="this.select()">`;
+            // 如果是第一次启动，或者没有从URL加载，则初始化HUD
+            updateHUD();
+        }
+
+        function resetGame() {
+            currentLevelIndex = 0;
+            currentLevel = levels[currentLevelIndex];
+            player.score = 0;
+            player.lives = 3;
+            resetPlayer();
+            document.getElementById('info-panel').style.display = 'flex';
+            document.getElementById('info-panel').innerHTML = '<h1>像素跳跃大冒险</h1><p>操作：方向键/WASD移动，空格/上键跳跃。</p><p>目标：收集所有金币，击败Boss，进入下一个关卡！</p><p>当前关卡: <span id="current-level-display">1 / 6</span></p><button id="start-button" onclick="startGame()">开始游戏</button><div id="share-url">分享链接: (游戏状态准备好后将在此显示)</div>';
+            gameState = 'START';
+            updateHUD();
+        }
+
+        // --- 初始化流程 ---
+        decodeGameState(); // 尝试从URL加载进度
+        document.getElementById('start-button').addEventListener('click', startGame);
+
+        // 启动游戏循环
+        loop();
+    </script>
+
+</body>
+</html>
