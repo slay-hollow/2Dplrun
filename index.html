@@ -9,13 +9,13 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f0f4f8; /* 浅蓝色背景 */
+            background-color: #f0f4f8; 
             color: #333;
             text-align: center;
         }
 
         h1 {
-            color: #1e3a5f; /* 深蓝色标题 */
+            color: #1e3a5f; 
             margin-bottom: 30px;
             font-size: 2.5em;
             border-bottom: 3px solid #60a5fa;
@@ -25,7 +25,7 @@
 
         #game-grid {
             display: grid;
-            /* 默认两列布局，适应大部分屏幕 */
+            /* 响应式网格：默认两列，如果空间足够则更多 */
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 30px;
             max-width: 1200px;
@@ -39,7 +39,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             transition: transform 0.3s, box-shadow 0.3s;
-            text-decoration: none; /* 移除链接下划线 */
+            text-decoration: none; 
             color: inherit;
             display: flex;
             flex-direction: column;
@@ -47,12 +47,12 @@
         }
 
         .game-card:hover {
-            transform: translateY(-5px); /* 悬停时稍微抬高 */
+            transform: translateY(-5px); 
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
         }
 
         .card-header {
-            background-color: #60a5fa; /* 蓝色头部 */
+            background-color: #60a5fa; 
             color: white;
             padding: 15px 20px;
             font-size: 1.3em;
@@ -77,12 +77,10 @@
             padding: 5px 10px;
             border-radius: 5px;
             font-weight: bold;
-            background-color: #fca5a5; /* 红色标记 */
-            color: #c52323;
         }
 
         .status-complete {
-            background-color: #a7f3d0; /* 绿色标记 */
+            background-color: #a7f3d0; 
             color: #065f46;
         }
     </style>
@@ -139,7 +137,7 @@
                 <span class="game-status status-complete">完成</span>
             </div>
             <div class="card-body">
-                <p>快速切开飞出的水果，避开炸弹！(您已实现了切片效果)</p>
+                <p>快速切开飞出的水果，避开炸弹！(带图片和切片效果)</p>
             </div>
         </a>
 
@@ -153,7 +151,7 @@
             </div>
         </a>
         
-        </div>
+    </div>
 
 </body>
 </html>
