@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的独立游戏大厅</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2c3e50; /* 深蓝色背景 */
+            color: white;
+            text-align: center;
+            padding: 50px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #ecf0f1;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+        }
+        #game-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            max-width: 900px;
+        }
+        .game-card {
+            background-color: #34495e; /* 稍深的卡片背景 */
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            width: 250px;
+            padding: 20px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-decoration: none;
+            color: white;
+            text-align: left;
+            position: relative;
+        }
+        .game-card:hover {
+            transform: translateY(-5px); /* 悬停上浮 */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+        }
+        .game-card h2 {
+            margin-top: 0;
+            color: #f1c40f; /* 醒目黄色标题 */
+            font-size: 1.5em;
+        }
+        .game-card p {
+            font-size: 0.9em;
+            color: #bdc3c7;
+        }
+        .game-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #27ae60; /* 绿色标签 */
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎮 我的独立游戏大厅</h1>
+    <p>欢迎来到我的网页游戏集！请选择你想挑战的游戏：</p>
+
+    <div id="game-list">
+        
+        <a href="game-platformer.html" class="game-card">
+            <span class="game-status">已发布</span>
+            <h2>像素跳跃大冒险</h2>
+            <p><strong>类型：</strong> 2D 平台跳跃</p>
+            <p><strong>特色：</strong> 6 个复杂关卡，重力物理，二段跳道具，可分享进度。</p>
+            <p>点击进入游戏 »</p>
+        </a>
+
+        <div class="game-card" style="opacity: 0.7;">
+            <span class="game-status" style="background-color: #e74c3c;">开发中</span>
+            <h2>星际射击 (Space Shooter)</h2>
+            <p><strong>类型：</strong> 弹幕射击</p>
+            <p><strong>特色：</strong> 飞船升级，多级 Boss 战。</p>
+            <p>敬请期待...</p>
+        </div>
+        
+        <div class="game-card" style="opacity: 0.7;">
+            <span class="game-status" style="background-color: #e67e22;">规划中</span>
+            <h2>方块消除 (Puzzle)</h2>
+            <p><strong>类型：</strong> 休闲益智</p>
+            <p><strong>特色：</strong> 时间挑战模式，全球排行榜（待集成）。</p>
+            <p>敬请期待...</p>
+        </div>
+
+    </div>
+
+</body>
+</html>
