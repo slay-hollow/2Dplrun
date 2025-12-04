@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大学恋爱物语 - 多结局视觉小说</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #game-container {
+            width: 900px;
+            height: 600px;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            background-color: #000;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+        
+        /* --- 背景图片 --- */
+        #background {
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 1.5s ease;
+            position: absolute;
+        }
+
+        /* --- 角色立绘 --- */
+        #sprite-area {
+            position: absolute;
+            bottom: 120px; 
+            width: 100%;
+            height: 400px;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            z-index: 10;
+        }
+
+        .sprite {
+            height: 100%;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: bottom center;
+            transition: opacity 0.5s, transform 0.5s;
+            opacity: 0;
+            width: 300px; 
+            max-height: 400px;
+            position: absolute; /* 使用绝对定位精确控制位置 */
+        }
+        #sprite-wuyi { left: 100px; }
+        #sprite-chengxu { right: 100px; }
+        #sprite-lirui { left: 300px; } /* 栗珥位于中央偏左 */
+
+
+        /* --- 对话框 --- */
+        #dialog-box {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            min-height: 120px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 15px;
+            box-sizing: border-box;
+            border-top: 3px solid #60a5fa;
+            z-index: 20;
+        }
+
+        #character-name {
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #60a5fa; 
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        #dialog-text {
+            min-height: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+        }
+
+        /* --- 选项区 --- */
+        #choices {
+            position: absolute;
+            top: 0; 
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none; 
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 30;
+        }
+
+        .choice-button {
+            width: 70%;
+            padding: 15px 20px;
+            background-color: #2e4a6e;
+            color: white;
+            border: 2px solid #60a5fa;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .choice-button:hover {
+            background-color: #3b5a83;
+            transform: translateY(-2px);
+        }
+
+        /* --- 属性面板 (HUD) --- */
+        #hud {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            text-align: left;
+            z-index: 25;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="background"></div>
+        
+        <div id="sprite-area">
+            <div id="sprite-wuyi" class="sprite"></div>
+            <div id="sprite-chengxu" class="sprite"></div>
+            <div id="sprite-lirui" class="sprite"></div>
+        </div>
+
+        <div id="hud">
+            **好感度/旗标:** <br>
+            雾依: <span id="aff-wuyi">50</span> | 
+            程续: <span id="aff-chengxu">50</span> | 
+            栗珥: <span id="aff-lirui">60</span><br>
+            军师: <span id="flag-junshi">否</span> | 
+            努力值: <span id="work-effort">30</span>
+        </div>
+
+        <div id="dialog-box">
+            <span id="character-name">旁白</span>
+            <div id="dialog-text">点击开始游戏...</div>
+        </div>
+
+        <div id="choices">
+            </div>
+    </div>
+    
+    <script>
+        // --- 1. 游戏状态 ---
+        const GameState = {
+            currentScene: 'SCENE_START',
+            dialogIndex: 0,
+            
+            // 核心属性
+            affWuyi: 50,
+            affChengxu: 50,
+            affLirui: 60,
+            
+            // 关键旗标
+            flagJunshi: false, 
+            flagConfess: false, 
+            workEffort: 30, 
+        };
+
+        // --- 2. 资源路径 (已根据您的文件名精确配置) ---
+        const ASSETS = {
+            // 背景图 (使用您提供的文件名)
+            '背景-教室': '2Dplrun/images/图书馆.png',
+            '背景-宿舍': '2Dplrun/images/宿舍.png',
+            '背景-咖啡厅': '2Dplrun/images/咖啡店.png', // 使用咖啡店作为约会背景
+
+            // 雾依立绘
+            '立绘-雾依-常态': '2Dplrun/images/雾依-常态.png',
+            '立绘-雾依-开心': '2Dplrun/images/雾依-开心.png',
+            '立绘-雾依-害羞': '2Dplrun/images/雾依-害羞.png',
+            '立绘-雾依-不高兴': '2Dplrun/images/雾依-不高兴.png',
+            
+            // 程续立绘
+            '立绘-程续-常态': '2Dplrun/images/程续-常态.png',
+            '立绘-程续-开心': '2Dplrun/images/程续-开心.png',
+            '立绘-程续-害羞': '2Dplrun/images/程续-害羞.png',
+            '立绘-程续-不高兴': '2Dplrun/images/程续-不高兴.png',
+
+            // 栗珥立绘 (注意栗珥-开心是 JPG)
+            '立绘-栗珥-常态': '2Dplrun/images/栗珥-常态.png',
+            '立绘-栗珥-开心': '2Dplrun/images/栗珥-开心.jpg', 
+            '立绘-栗珥-害羞': '2Dplrun/images/栗珥-害羞.png',
+            '立绘-栗珥-不高兴': '2Dplrun/images/栗珥-不高兴.png',
+        };
+
+        // --- 3. DOM 引用 ---
+        const DOM = {
+            background: document.getElementById('background'),
+            dialogBox: document.getElementById('dialog-box'),
+            charName: document.getElementById('character-name'),
+            dialogText: document.getElementById('dialog-text'),
+            choices: document.getElementById('choices'),
+            affWuyi: document.getElementById('aff-wuyi'),
+            affChengxu: document.getElementById('aff-chengxu'),
+            affLirui: document.getElementById('aff-lirui'),
+            flagJunshi: document.getElementById('flag-junshi'),
+            workEffort: document.getElementById('work-effort'),
+            spriteWuyi: document.getElementById('sprite-wuyi'),
+            spriteChengxu: document.getElementById('sprite-chengxu'),
+            spriteLirui: document.getElementById('sprite-lirui'),
+        };
+
+        // --- 4. 剧情数据 (包含 Stage 1 和 Stage 2 详细内容) ---
+        // 结构: SceneName: [ {name: '角色名', text: '对话内容', bg: '背景名', sprite: {角色名: '表情'}}, ...]
+        const STORY_DATA = {
+            
+            // =========================================================
+            // == 阶段 1: 启动与初识 (第一天剧情)
+            // =========================================================
+
+            SCENE_START: [
+                { name: '旁白', text: '大学二年级开学。窗外蝉鸣，宿管大爷的鼾声和程续打游戏的声音交织在一起。', bg: '背景-宿舍' },
+                { name: '程续', text: '（头也不抬）喂，老弟，快起来，今天有必修课，别翘了！', sprite: { 程续: '常态' } },
+                { name: '主角', text: '（内心）我叫主角，正在努力适应大学生活。程续是我的室友，一个爱打游戏的家伙，同时也是我的好哥们。', sprite: { 程续: '常态' } },
+                { name: '旁白', text: '你犹豫了一下，是继续睡还是去上课？', sprite: { 程续: null }, next: 'CHOICE_DAY1_A' } 
+            ],
+            
+            CHOICE_DAY1_A: {
+                options: [
+                    { text: '选项1: 起床，为了不挂科冲啊！', next: 'SCENE_DAY1_CLASS_WUYI', changes: { workEffort: 5 } },
+                    { text: '选项2: 再睡十分钟，反正点名可以找人帮忙。', next: 'SCENE_DAY1_SLEEP', changes: { affChengxu: -5, workEffort: -5 } },
+                    { text: '选项3: 起来后先给妹妹栗珥发个信息问候。', next: 'SCENE_DAY1_CALL_LIRUI', changes: { affLirui: 10 } }
+                ]
+            },
+
+            // 分支 1.1：去上课，遇到雾依
+            SCENE_DAY1_CLASS_WUYI: [
+                { name: '旁白', text: '你来到教室，旁边坐着雾依。', bg: '背景-教室' },
+                { name: '雾依', text: '你好，同学，能借我一下你的笔吗？', sprite: { 雾依: '常态' } },
+                { name: '主角', text: '（内心）冰山美人雾依主动和我说话了！', next: 'CHOICE_DAY1_WUYI' }
+            ],
+            CHOICE_DAY1_WUYI: {
+                options: [
+                    { text: '选项1: 爽快地递给她，保持微笑。', next: 'SCENE_DAY1_WUYI_GOOD', changes: { affWuyi: 10 } },
+                    { text: '选项2: 递笔，并说：“下次记得带。” (略显直男)', next: 'SCENE_DAY1_WUYI_BAD', changes: { affWuyi: -10 } },
+                    { text: '选项3: 递笔，并邀请：“课后一起去图书馆吗？” (过于冒进)', next: 'SCENE_DAY1_WUYI_LIBRARY', changes: { affWuyi: -5 } }
+                ]
+            },
+            SCENE_DAY1_WUYI_GOOD: [
+                { name: '雾依', text: '（微微一笑）谢谢你。', sprite: { 雾依: '开心' } },
+                { name: '旁白', text: '回宿舍后，你向程续提到了雾依。', sprite: { 雾依: null } },
+                { name: '程续', text: '不错嘛，能搭上话！想追的话，我程续可以献出我的智慧！', sprite: { 程续: '开心' } , next: 'CHOICE_DAY1_JUNSHI' }
+            ],
+            SCENE_DAY1_WUYI_BAD: [
+                { name: '雾依', text: '...（沉默，收回视线）', sprite: { 雾依: '不高兴' } },
+                { name: '旁白', text: '回宿舍后，你向程续抱怨了雾依的冷淡。', sprite: { 雾依: null } },
+                { name: '程续', text: '你活该！你跟女生说话的方式太差了！想追的话，我来教你！', sprite: { 程续: '不高兴' } , next: 'CHOICE_DAY1_JUNSHI' }
+            ],
+            SCENE_DAY1_WUYI_LIBRARY: [
+                { name: '雾依', text: '不用了，我还有事。谢谢你的笔。', sprite: { 雾依: '不高兴' } },
+                { name: '旁白', text: '雾依似乎被吓到了。回宿舍后，程续嘲笑了你的失败。', sprite: { 雾依: null } },
+                { name: '程续', text: '（嘲笑）我就知道你搞不定！让我来当军师吧！', sprite: { 程续: '开心' } , next: 'CHOICE_DAY1_JUNSHI' }
+            ],
+
+            // 分支 1.2：继续睡觉
+            SCENE_DAY1_SLEEP: [
+                { name: '程续', text: '（生气）喂！我说真的！你自己看着办吧！', sprite: { 程续: '不高兴' } },
+                { name: '程续', text: '（摔门）你自己看着办！', sprite: { 程续: null } },
+                { name: '旁白', text: '你睡到中午才醒来，发现栗珥给你发了消息。', bg: '背景-宿舍' },
+                { name: '栗珥', text: '哥哥，听说你翘课了？要好好学习啊，不然以后工作怎么办？', sprite: { 栗珥: '不高兴' }, next: 'CHOICE_DAY1_LIRUI_WAKEUP' }
+            ],
+            CHOICE_DAY1_LIRUI_WAKEUP: {
+                options: [
+                    { text: '选项1: 保证下次一定去：“知道了，下次一定去，别担心我。”', next: 'SCENE_DAY1_END', changes: { affLirui: 5 } },
+                    { text: '选项2: 转移话题：“你最近在学校还好吗？”', next: 'SCENE_DAY1_END', changes: { affLirui: 1 } },
+                    { text: '选项3: 敷衍她：“我长大了，不用你管。” (负面)', next: 'SCENE_DAY1_END', changes: { affLirui: -10 } }
+                ]
+            },
+
+            // 分支 1.3：给栗珥发信息
+            SCENE_DAY1_CALL_LIRUI: [
+                { name: '栗珥', text: '喂，哥哥，好久没收到你的消息了！一切都好！你有没有好好吃饭？', sprite: { 栗珥: '开心' } },
+                { name: '主角', text: '（内心）栗珥的声音总是那么元气满满。', next: 'SCENE_DAY1_END' }
+            ],
+
+            // 军师旗标分支（关键）
+            CHOICE_DAY1_JUNSHI: {
+                options: [
+                    { text: '选项1: 接受程续的提议：“好兄弟，就靠你的智慧了！”', next: 'SCENE_DAY1_END_WUYI_JUNSHI', changes: { affChengxu: 10, flagJunshi: true } }, 
+                    { text: '选项2: 拒绝，表示自己能搞定：“我自己来，追女孩子要靠真心。”', next: 'SCENE_DAY1_END', changes: { affChengxu: -5 } },
+                    { text: '选项3: 问：“你当军师是想近水楼台先得月吧？” (半开玩笑)', next: 'SCENE_DAY1_END', changes: { affChengxu: 5 } }
+                ]
+            },
+            SCENE_DAY1_END_WUYI_JUNSHI: [
+                { name: '程续', text: '（眼神坚定）包在我身上！为了你的幸福！', sprite: { 程续: '常态' } },
+                { name: '旁白', text: '程续拍了拍胸脯，眼中似乎闪烁着异样的光芒。', sprite: { 程续: null }, next: 'SCENE_DAY1_END' }
+            ],
+
+
+            // 阶段 1 结束
+            SCENE_DAY1_END: [
+                { name: '旁白', text: '第一天的大学生活结束了。新的学期开始了，你的目标是？', sprite: { 栗珥: null, 程续: null, 雾依: null }, next: 'SCENE_MONTH1_START' }
+            ],
+            
+            // =========================================================
+            // == 阶段 2: 深入了解 (第一个月)
+            // =========================================================
+            SCENE_MONTH1_START: [
+                { name: '旁白', text: '第一个月，你开始规划课余时间。你想把时间花在哪里？', bg: '背景-宿舍' },
+                { name: '主角', text: '（内心）是时候展开行动了，我必须选择一个方向！', next: 'CHOICE_MONTH1_ACTION' }
+            ],
+            
+            CHOICE_MONTH1_ACTION: {
+                options: [
+                    { text: '选项1: 努力学习专业知识，多去图书馆。', next: 'SCENE_MONTH1_WUYI_LIB', changes: { workEffort: 15, affChengxu: -5 } },
+                    { text: '选项2: 响应程续的召唤，和他一起参加社团活动。', next: 'SCENE_MONTH1_CHENGXU_CLUB', changes: { affChengxu: 15, affWuyi: -5 } },
+                    { text: '选项3: 关心栗珥的学业，周末约她出来吃饭。', next: 'SCENE_MONTH1_LIRUI_DATE', changes: { affLirui: 15, affWuyi: -5 } }
+                ]
+            },
+            
+            // 分支 2.1：攻略雾依线 - 图书馆偶遇
+            SCENE_MONTH1_WUYI_LIB: [
+                { name: '旁白', text: '图书馆里，你意外地又碰到了雾依，她正在翻阅一本你需要的专业书。', bg: '背景-教室' },
+                { name: '雾依', text: '（抬头）是你？真巧。你也在看这本书吗？', sprite: { 雾依: '常态' } },
+                { name: '主角', text: '是的，这门课很难，我正愁找不到重点。', next: 'CHOICE_MONTH1_WUYI_SHARE' }
+            ],
+            CHOICE_MONTH1_WUYI_SHARE: {
+                options: [
+                    { text: '选项1: 邀请她一起研读，分享笔记。', next: 'SCENE_MONTH1_WUYI_GOOD_END', changes: { affWuyi: 15 } },
+                    { text: '选项2: 问她是否遇到了什么困难，表示乐于助人。', next: 'SCENE_MONTH1_WUYI_NORMAL_END', changes: { affWuyi: 5 } },
+                    { text: '选项3: 告诉她：“其实我不是来看书的，我是来看你的。” (高风险)', next: 'SCENE_MONTH1_WUYI_BAD_END', changes: { affWuyi: -15 } }
+                ]
+            },
+            SCENE_MONTH1_WUYI_GOOD_END: [
+                { name: '雾依', text: '那太好了，我们互相交流吧。', sprite: { 雾依: '开心' } },
+                { name: '旁白', text: '你和雾依度过了一个高效且愉快的下午，好感度大幅提升。', sprite: { 雾依: null }, next: 'SCENE_MONTH2_START' }
+            ],
+            SCENE_MONTH1_WUYI_NORMAL_END: [
+                { name: '雾依', text: '谢谢，我自己能解决。不过能遇到你很高兴。', sprite: { 雾依: '常态' } },
+                { name: '旁白', text: '虽然略有遗憾，但你的关心让她感觉不错。', sprite: { 雾依: null }, next: 'SCENE_MONTH2_START' }
+            ],
+            SCENE_MONTH1_WUYI_BAD_END: [
+                { name: '雾依', text: '（冷漠）请你自重。', sprite: { 雾依: '不高兴' } },
+                { name: '旁白', text: '雾依立刻离开了图书馆。你的心碎了一地。', sprite: { 雾依: null }, next: 'SCENE_MONTH2_START' }
+            ],
+
+            // 分支 2.2：攻略程续线 - 社团活动
+            SCENE_MONTH1_CHENGXU_CLUB: [
+                { name: '程续', text: '（兴奋）老弟，这次社团的篝火晚会需要有人抬设备，跟我走！', bg: '背景-宿舍', sprite: { 程续: '开心' } },
+                { name: '旁白', text: '你和程续一起在体育馆忙碌了一下午，虽然很累，但你们之间的友谊似乎更深了。', sprite: { 程续: '开心' } },
+                { name: '程续', text: '来，干了这瓶汽水！你真是我最好的兄弟！对了，雾依那边你打算怎么办？', next: 'CHOICE_MONTH1_CHENGXU_HELP' }
+            ],
+            CHOICE_MONTH1_CHENGXU_HELP: {
+                options: [
+                    { text: '选项1: 提到军师旗标：“有你这位军师在，我心里有底。”', next: 'SCENE_MONTH1_CHENGXU_JUNSHI_END', changes: { affChengxu: 10 } }, 
+                    { text: '选项2: 转移话题：“别光说我，你有没有看上的女生？”', next: 'SCENE_MONTH1_CHENGXU_NORMAL_END', changes: { affChengxu: 5 } },
+                    { text: '选项3: 叹气：“可能我天生就不是追女生的料吧。” (示弱)', next: 'SCENE_MONTH1_CHENGXU_NORMAL_END', changes: { affChengxu: 5 } }
+                ]
+            },
+            SCENE_MONTH1_CHENGXU_JUNSHI_END: [
+                { name: '程续', text: '（脸颊微红）当然！为了你，我一定鞠躬尽瘁！', sprite: { 程续: '害羞' } },
+                { name: '旁白', text: '程续的反应似乎有些夸张，但你没多想。程续线隐藏进度增加。', sprite: { 程续: null }, next: 'SCENE_MONTH2_START' }
+            ],
+            SCENE_MONTH1_CHENGXU_NORMAL_END: [
+                { name: '程续', text: '哪有，只是还没遇到对的人。兄弟，放松点！', sprite: { 程续: '常态' } },
+                { name: '旁白', text: '你们互相打气，继续做着好兄弟。', sprite: { 程续: null }, next: 'SCENE_MONTH2_START' }
+            ],
+
+            // 分支 2.3：攻略栗珥线 - 约会
+            SCENE_MONTH1_LIRUI_DATE: [
+                { name: '旁白', text: '你约了栗珥到校外咖啡厅吃饭，她显得非常开心。', bg: '背景-咖啡厅' },
+                { name: '栗珥', text: '哇！哥哥，这个蛋糕超好吃！谢谢你特地来看我！', sprite: { 栗珥: '开心' } },
+                { name: '主角', text: '傻瓜，我们是家人嘛。', next: 'CHOICE_MONTH1_LIRUI_FAMILY' }
+            ],
+            CHOICE_MONTH1_LIRUI_FAMILY: {
+                options: [
+                    { text: '选项1: 强调关系：“虽然是养妹，但你比亲妹妹还重要。”', next: 'SCENE_MONTH1_LIRUI_GOOD_END', changes: { affLirui: 15 } }, 
+                    { text: '选项2: 称赞她的努力：“最近学习很努力，注意休息。”', next: 'SCENE_MONTH1_LIRUI_NORMAL_END', changes: { affLirui: 5 } },
+                    { text: '选项3: 问她：“有没有在学校交到喜欢的男生？”', next: 'SCENE_MONTH1_LIRUI_BAD_END', changes: { affLirui: -10 } }
+                ]
+            },
+            SCENE_MONTH1_LIRUI_GOOD_END: [
+                { name: '栗珥', text: '（眼眶微红）嗯！哥哥，有你在我真幸福！', sprite: { 栗珥: '害羞' } },
+                { name: '旁白', text: '栗珥的情绪被你安抚，她对你的依恋加深了。', sprite: { 栗珥: null }, next: 'SCENE_MONTH2_START' }
+            ],
+            SCENE_MONTH1_LIRUI_NORMAL_END: [
+                { name: '栗珥', text: '嗯！我会的！哥哥也要照顾好自己！', sprite: { 栗珥: '开心' } },
+                { name: '旁白', text: '这次会面维持了你们良好的兄妹关系。', sprite: { 栗珥: null }, next: 'SCENE_MONTH2_START' }
+            ],
+            SCENE_MONTH1_LIRUI_BAD_END: [
+                { name: '栗珥', text: '（语气低落）...没有，我只想好好学习。', sprite: { 栗珥: '不高兴' } },
+                { name: '旁白', text: '栗珥似乎不太想谈这个话题。', sprite: { 栗珥: null }, next: 'SCENE_MONTH2_START' }
+            ],
+
+            // =========================================================
+            // == 阶段 3: 深入了解 (第二个月) - 【请从这里开始添加更多剧情】
+            // =========================================================
+            SCENE_MONTH2_START: [
+                { name: '旁白', text: '第二个月，你的生活重心似乎有些倾斜。你觉得接下来应该如何度过？', sprite: { 栗珥: null, 程续: null, 雾依: null }, bg: '背景-宿舍' },
+                { name: '主角', text: '（内心）我不能分心太多，必须专注于某个目标。', next: 'CHOICE_MONTH2_ACTION' }
+            ],
+            
+            CHOICE_MONTH2_ACTION: {
+                options: [
+                    { text: '选项1: 努力寻找雾依的爱好，准备一份小礼物。', next: 'SCENE_MONTH2_WUYI_GIFT', changes: { workEffort: -10 } },
+                    { text: '选项2: 程续提议周末去爬山放松，陪他一起去。', next: 'SCENE_MONTH2_CHENGXU_MOUNTAIN', changes: { affChengxu: 10 } },
+                    { text: '选项3: 栗珥生病了，你决定立刻去照顾她。', next: 'SCENE_MONTH2_LIRUI_SICK', changes: { affLirui: 20 } }
+                ]
+            },
+            
+            // 分支 3.1：攻略雾依线 - 送礼
+            SCENE_MONTH2_WUYI_GIFT: [
+                 { name: '旁白', text: '通过各种途径，你打听到雾依喜欢文学。你买了一本她喜欢的作家的首版精装本，在教室门口等她。', bg: '背景-教室' },
+                 { name: '雾依', text: '（惊讶）这本书？你怎么知道我喜欢？', sprite: { 雾依: '常态' } },
+                 { name: '主角', text: '（紧张）我...我只是偶尔听说的。送给你！', next: 'CHOICE_MONTH2_WUYI_ACCEPT' }
+            ],
+            CHOICE_MONTH2_WUYI_ACCEPT: {
+                options: [
+                    { text: '选项1: 拒绝她的道谢，只说希望她喜欢。', next: 'SCENE_MONTH2_WUYI_GOOD_END2', changes: { affWuyi: 15 } },
+                    { text: '选项2: 告诉她：“如果想感谢我，请和我一起吃晚饭。” (大胆)', next: 'SCENE_MONTH2_WUYI_NORMAL_END2', changes: { affWuyi: 5 } },
+                    // 动态选项：只有当程续是军师时才出现
+                    { text: '选项3: (程续军师线) 发送程续教你的土味情话。', next: 'SCENE_MONTH2_WUYI_JUNSHI_TRICK', condition: () => GameState.flagJunshi } 
+                ]
+            },
+            SCENE_MONTH2_WUYI_GOOD_END2: [
+                { name: '雾依', text: '谢谢，我很喜欢。下次，我请你喝咖啡吧。', sprite: { 雾依: '开心' } },
+                { name: '旁白', text: '约会旗标达成！雾依的好感度进入高位。', sprite: { 雾依: null }, next: 'SCENE_MONTH3_START' }
+            ],
+            SCENE_MONTH2_WUYI_NORMAL_END2: [
+                { name: '雾依', text: '（犹豫）...再说吧。不过礼物我很感谢。', sprite: { 雾依: '常态' } },
+                { name: '旁白', text: '虽然未能成功约会，但至少礼物送到。', sprite: { 雾依: null }, next: 'SCENE_MONTH3_START' }
+            ],
+            SCENE_MONTH2_WUYI_JUNSHI_TRICK: [
+                { name: '主角', text: '（程续附体）知道为什么我的心跳加速吗？因为它在为你而跳！', sprite: { 雾依: '不高兴' } },
+                { name: '雾依', text: '（沉默，然后皱眉）...你今天很奇怪。', next: 'SCENE_MONTH3_START', changes: { affWuyi: -20, affChengxu: -10 } }
+            ],
+            
+            // 分支 3.2：攻略程续线 - 爬山试探
+            SCENE_MONTH2_CHENGXU_MOUNTAIN: [
+                { name: '程续', text: '（在山顶）哇！老弟，这景色太棒了！只有我们俩！', bg: '背景-咖啡厅', sprite: { 程续: '开心' } },
+                { name: '主角', text: '（内心）程续今天很兴奋，他好像很喜欢只有我们两个人的活动。', next: 'CHOICE_MONTH2_CHENGXU_TALK' }
+            ],
+            CHOICE_MONTH2_CHENGXU_TALK: {
+                options: [
+                    { text: '选项1: 问他：“你为什么不约喜欢的女生出来，反而约我？”', next: 'SCENE_MONTH2_CHENGXU_PROBE_GOOD', changes: { affChengxu: 15 } },
+                    { text: '选项2: 告诉他：“我的体力不如你，下次我们找个轻松点的活动。”', next: 'SCENE_MONTH2_CHENGXU_NORMAL_END3', changes: { affChengxu: 5 } },
+                    { text: '选项3: 问：“你觉得雾依怎么样？你有什么好主意？”', next: 'SCENE_MONTH2_CHENGXU_PROBE_BAD', changes: { affChengxu: -10 } }
+                ]
+            },
+            SCENE_MONTH2_CHENGXU_PROBE_GOOD: [
+                { name: '程续', text: '（沉默了几秒，脸红）...因为，因为跟你在一起最舒服啊！', sprite: { 程续: '害羞' } },
+                { name: '旁白', text: '程续的回答让你心头一跳。程续线进度大幅增加。', sprite: { 程续: null }, next: 'SCENE_MONTH3_START' }
+            ],
+            SCENE_MONTH2_CHENGXU_PROBE_BAD: [
+                { name: '程续', text: '（语气低沉）...你还是对她念念不忘啊。', sprite: { 程续: '不高兴' } },
+                { name: '旁白', text: '程续显得有些不高兴。', sprite: { 程续: null }, next: 'SCENE_MONTH3_START' }
+            ],
+            
+            // 分支 3.3：攻略栗珥线 - 照顾
+            SCENE_MONTH2_LIRUI_SICK: [
+                { name: '旁白', text: '你来到栗珥的宿舍，她发着高烧，看到你来了，眼泪都快掉下来了。', bg: '背景-宿舍' },
+                { name: '栗珥', text: '（虚弱）哥哥...你怎么来了...', sprite: { 栗珥: '不高兴' } },
+                { name: '主角', text: '傻瓜，你生病了，我能不来吗？', next: 'CHOICE_MONTH2_LIRUI_FEED' }
+            ],
+            CHOICE_MONTH2_LIRUI_FEED: {
+                options: [
+                    { text: '选项1: 亲自喂她喝粥，温柔地给她擦汗。', next: 'SCENE_MONTH2_LIRUI_GOOD_END3', changes: { affLirui: 25 } },
+                    { text: '选项2: 叫外卖送到宿舍，叮嘱她按时吃药。', next: 'SCENE_MONTH2_LIRUI_NORMAL_END3', changes: { affLirui: 5 } },
+                    { text: '选项3: 问她：“你是不是因为最近没好好吃饭才生病的？” (指责)', next: 'SCENE_MONTH2_LIRUI_BAD_END3', changes: { affLirui: -10 } }
+                ]
+            },
+            SCENE_MONTH2_LIRUI_GOOD_END3: [
+                { name: '栗珥', text: '（感动）哥哥，你对我真好...比...比任何人...都好。', sprite: { 栗珥: '害羞' } },
+                { name: '旁白', text: '栗珥的情感彻底被你的温柔融化，她的好感度已处于临界点。', sprite: { 栗珥: null }, next: 'SCENE_MONTH3_START' }
+            ],
+            SCENE_MONTH2_LIRUI_NORMAL_END3: [
+                { name: '栗珥', text: '谢谢哥哥，你回去吧，别传染给你了。', sprite: { 栗珥: '常态' } },
+                { name: '旁白', text: '你尽到了兄长的责任，关系稳定。', sprite: { 栗珥: null }, next: 'SCENE_MONTH3_START' }
+            ],
+            SCENE_MONTH2_LIRUI_BAD_END3: [
+                { name: '栗珥', text: '（委屈地哭泣）对不起...', sprite: { 栗珥: '不高兴' } },
+                { name: '旁白', text: '栗珥伤心地哭了，你意识到自己的话太过严厉。', sprite: { 栗珥: null }, next: 'SCENE_MONTH3_START' }
+            ],
+            
+
+            // =========================================================
+            // == 阶段 4: 后续阶段的占位符（供您添加内容）
+            // =========================================================
+
+            SCENE_MONTH3_START: [
+                { name: '系统', text: '--- 剧情：第三个月开始 ---', next: 'SCENE_MONTH4_START' }
+            ],
+            SCENE_MONTH4_START: [
+                { name: '系统', text: '--- 剧情：第四个月开始 ---', next: 'SCENE_MONTH5_START' }
+            ],
+            SCENE_MONTH5_START: [
+                { name: '系统', text: '--- 剧情：第五个月开始，准备告白 ---', next: 'CHOICE_CONFESS' }
+            ],
+            
+            // 告白选项
+            CHOICE_CONFESS: {
+                 options: [
+                    { text: '选项1: 勇敢地向雾依告白！', next: 'SCENE_JUDGEMENT', changes: { flagConfess: true } },
+                    { text: '选项2: 勇敢地向程续告白！', next: 'SCENE_JUDGEMENT', changes: { flagConfess: true } },
+                    { text: '选项3: 什么都不做，让事情顺其自然。', next: 'SCENE_JUDGEMENT', changes: { flagConfess: false } }
+                 ]
+            },
+            
+            SCENE_JUDGEMENT: [
+                { name: '旁白', text: '毕业季来临。你的大学恋爱物语迎来了终结。', next: 'FUNCTION_END' }
+            ],
+            
+            // 最终结局
+            FUNCTION_END: {
+                options: [
+                    { text: '点击查看结局...', next: 'SCENE_ENDING_PROCESS' }
+                ]
+            },
+            SCENE_ENDING_PROCESS: [
+                { name: '系统', text: '正在根据最终好感度和旗标判定结局...', next: 'FUNCTION_CHECK_ENDING' }
+            ]
+        };
+
+        // --- 5. 核心逻辑函数 ---
+
+        function updateHUD() {
+            DOM.affWuyi.textContent = GameState.affWuyi;
+            DOM.affChengxu.textContent = GameState.affChengxu;
+            DOM.affLirui.textContent = GameState.affLirui;
+            DOM.flagJunshi.textContent = GameState.flagJunshi ? '是' : '否';
+            DOM.workEffort.textContent = GameState.workEffort;
+        }
+        
+        function setBackground(bgName) {
+            const url = ASSETS[bgName];
+            if (url) {
+                DOM.background.style.backgroundImage = `url('${url}')`;
+            } else {
+                DOM.background.style.backgroundImage = 'none';
+            }
+        }
+        
+        // 5.2. 切换立绘 (更新：根据表情显示对应的图片)
+        function setSprites(spriteConfig) {
+            const sprites = {
+                '雾依': DOM.spriteWuyi,
+                '程续': DOM.spriteChengxu,
+                '栗珥': DOM.spriteLirui,
+            };
+            
+            // 1. 默认隐藏所有立绘
+            for (const charName in sprites) {
+                sprites[charName].style.opacity = 0;
+            }
+
+            // 2. 显示指定的立绘及其表情
+            for (const charName in spriteConfig) {
+                const expression = spriteConfig[charName]; // 期望的表情，如 '开心'
+                const spriteElement = sprites[charName];
+                
+                // 如果表情为 null，表示明确要隐藏该角色 (场景切换时使用)
+                if (expression === null) {
+                    continue; 
+                }
+                
+                const assetKey = `立绘-${charName}-${expression}`;
+                const assetUrl = ASSETS[assetKey];
+
+                if (assetUrl) {
+                    spriteElement.style.backgroundImage = `url('${assetUrl}')`;
+                    spriteElement.style.opacity = 1;
+                    // 简单的缩放动画
+                    spriteElement.style.transform = 'scale(1.02)'; 
+                    setTimeout(() => {
+                        spriteElement.style.transform = 'scale(1)';
+                    }, 50);
+
+                } else {
+                     console.error(`ERROR: 立绘资源 ${assetKey} 不存在! 请检查文件名是否为 ${ASSETS[assetKey]}。`);
+                }
+            }
+        }
+
+        // 5.3. 跳转到下一个对话或选项
+        function nextDialog() {
+            const scene = STORY_DATA[GameState.currentScene];
+            
+            if (!scene || GameState.dialogIndex >= scene.length) {
+                const lastNode = scene ? scene[scene.length - 1] : null;
+                if (lastNode && lastNode.next) {
+                    goToScene(lastNode.next);
+                }
+                return;
+            }
+
+            const dialogNode = scene[GameState.dialogIndex];
+            
+            // 1. 应用场景和立绘变化
+            if (dialogNode.bg) {
+                setBackground(dialogNode.bg);
+            }
+            if (dialogNode.sprite) {
+                setSprites(dialogNode.sprite);
+            }
+
+            // 2. 显示对话
+            DOM.charName.textContent = dialogNode.name;
+            DOM.dialogText.textContent = dialogNode.text;
+
+            // 3. 检查选项
+            if (dialogNode.next && typeof STORY_DATA[dialogNode.next] === 'object' && STORY_DATA[dialogNode.next].options) {
+                showChoices(dialogNode.next);
+                // 不增加 index，因为选项被选择后会调用 selectChoice
+            } else {
+                GameState.dialogIndex++;
+            }
+        }
+        
+        // 5.4. 显示选项
+        function showChoices(choiceSceneName) {
+            const choiceData = STORY_DATA[choiceSceneName];
+            DOM.choices.innerHTML = '';
+            DOM.dialogBox.style.display = 'none'; 
+            
+            // 遍历选项并动态生成
+            choiceData.options.forEach((option) => {
+                // 检查动态选项条件
+                if (option.condition && !option.condition()) {
+                    return; // 如果条件不满足，跳过该选项
+                }
+
+                const button = document.createElement('button');
+                button.className = 'choice-button';
+                button.textContent = option.text;
+                button.onclick = () => selectChoice(option.next, option.changes);
+                DOM.choices.appendChild(button);
+            });
+            
+            // 如果一个选项都没有，说明进入了死胡同或逻辑错误
+            if (DOM.choices.children.length === 0) {
+                 const errorButton = document.createElement('button');
+                 errorButton.className = 'choice-button';
+                 errorButton.textContent = '【系统错误】当前场景没有可用选项或条件错误。';
+                 DOM.choices.appendChild(errorButton);
+            }
+
+            DOM.choices.style.display = 'flex'; 
+        }
+
+        // 5.5. 选择选项并应用变化
+        function selectChoice(nextScene, changes) {
+            DOM.choices.style.display = 'none';
+            DOM.dialogBox.style.display = 'block';
+
+            // 应用属性变化
+            if (changes) {
+                if (changes.affWuyi) GameState.affWuyi = Math.min(100, Math.max(0, GameState.affWuyi + changes.affWuyi));
+                if (changes.affChengxu) GameState.affChengxu = Math.min(100, Math.max(0, GameState.affChengxu + changes.affChengxu));
+                if (changes.affLirui) GameState.affLirui = Math.min(100, Math.max(0, GameState.affLirui + changes.affLirui));
+                if (changes.flagJunshi !== undefined) GameState.flagJunshi = changes.flagJunshi;
+                if (changes.flagConfess !== undefined) GameState.flagConfess = changes.flagConfess;
+                if (changes.workEffort) GameState.workEffort = Math.min(100, Math.max(0, GameState.workEffort + changes.workEffort));
+            }
+            
+            updateHUD();
+            goToScene(nextScene);
+        }
+        
+        // 5.6. 跳转到新的场景 (已更新，用于处理最终结局判定)
+        function goToScene(sceneName) {
+             if (sceneName === 'FUNCTION_END' || sceneName === 'FUNCTION_CHECK_ENDING') {
+                runEnding();
+                return;
+            }
+            
+            GameState.currentScene = sceneName;
+            GameState.dialogIndex = 0;
+            nextDialog();
+        }
+
+
+        // --- 6. 最终结局判定逻辑 (已集成) ---
+        
+        function checkEnding() {
+            let affW = GameState.affWuyi;
+            let affC = GameState.affChengxu;
+            let affL = GameState.affLirui;
+            let highest = Math.max(affW, affC, affL);
+
+            // 1. 栗珥结局 (栗珥线是唯一由她告白的线，需要好感度压倒性高，且主角未主动告白)
+            if (affL >= 90 && highest === affL && GameState.flagConfess === false) {
+                 return 'ENDING_LIRUI'; 
+            } 
+            
+            // 2. 程续结局 (需要程续好感高，且激活了军师旗标，主角选择告白)
+            if (affC >= 90 && GameState.flagJunshi && GameState.flagConfess) {
+                 return 'ENDING_CHENGXU'; 
+            }
+
+            // 3. 雾依结局 (需要雾依好感高，主角选择告白)
+            if (affW >= 90 && GameState.flagConfess) {
+                 return 'ENDING_WUYI'; 
+            }
+
+            // 4. 大学毕业即失业 (攻略全部失败，但玩家尝试告白/告白失败)
+            if (GameState.flagConfess && affW < 90 && affC < 90 && affL < 90) {
+                 return 'ENDING_FAILURE'; 
+            }
+
+            // 5. 公务员相亲 (谁也没去攻略，主角没告白，工作努力值高)
+            if (GameState.flagConfess === false && GameState.workEffort >= 70) {
+                 return 'ENDING_GOVERNMENT'; 
+            }
+
+            // 默认结局 (未达到其他任何结局标准，且工作不努力)
+            return 'ENDING_FAILURE';
+        }
+        
+        function runEnding() {
+             const finalEnding = checkEnding();
+             let endingText = '';
+             
+             // 清空立绘和背景
+             setBackground(null);
+             setSprites({雾依: null, 程续: null, 栗珥: null});
+
+             switch (finalEnding) {
+                 case 'ENDING_LIRUI':
+                     endingText = '【栗珥结局】毕业典礼，栗珥大胆告白：“哥哥，我不想只当你妹妹！”你与元气养妹走到了一起。';
+                     break;
+                 case 'ENDING_CHENGXU':
+                     endingText = '【程续结局】在军师的伪装下，程续成功将你收入囊中。你们的兄弟情升华成了爱情。';
+                     break;
+                 case 'ENDING_WUYI':
+                     endingText = '【雾依结局】你的温柔最终融化了冰山，她为你露出了最美的笑容，你们开始了甜蜜的校园恋情。';
+                     break;
+                 case 'ENDING_GOVERNMENT':
+                     endingText = '【公务员相亲结局】你虽然没谈恋爱，但成功上岸。在父母安排下，你穿着西装，开始了相亲之旅。';
+                     break;
+                 case 'ENDING_FAILURE':
+                 default:
+                     endingText = '【失败结局】大学四年，你错过了所有的机会。告白被拒，毕业即失业，成为了无业游民，人生一片灰暗。';
+                     break;
+             }
+             
+             DOM.charName.textContent = '【命运的终章】';
+             DOM.dialogText.textContent = endingText;
+             DOM.dialogText.onclick = null; // 停止继续推进
+        }
+
+
+        // --- 7. 游戏启动 ---
+        
+        // 点击对话框，推进剧情
+        DOM.dialogText.onclick = nextDialog;
+
+        window.onload = function() {
+            updateHUD();
+            nextDialog(); // 开始游戏
+        };
+
+    </script>
+</body>
+</html>
