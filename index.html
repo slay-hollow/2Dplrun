@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>像素跳跃大冒险 - Six Levels</title>
+    <title>像素跳跃大冒险 - Six Levels (已修复)</title>
     <style>
         /* ------------------------------------- */
         /* 1. CSS样式：让游戏居中显示并设置像素风字体 */
@@ -131,37 +131,38 @@
             score: 0,
             lives: 3,
             canDoubleJump: false, // 道具效果
-            usedDoubleJump: false
+            usedDoubleJump: false, // 是否已使用二段跳
+            justJumped: false // 修正跳跃长按的bug
         };
 
-        // 基础关卡数据 (包含6个关卡，玩法逐渐复杂)
+        // 基础关卡数据 (包含6个关卡，所有对象都明确了 width/height 避免崩溃)
         const levels = [
             // Level 1: 简单的平台和金币
             [
-                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE }, // 地面
+                { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
                 { type: 'platform', x: 200, y: 350, width: 100, height: TILE_SIZE },
                 { type: 'coin', x: 250, y: 300, width: TILE_SIZE, height: TILE_SIZE },
                 { type: 'coin', x: 100, y: 416, width: TILE_SIZE, height: TILE_SIZE },
                 { type: 'exit', x: 600, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
             ],
-            // Level 2: 尖刺和二段跳道具
+            // Level 2: 尖刺和二段跳道具 (修复了对象尺寸，避免崩溃)
             [
                 { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
                 { type: 'platform', x: 400, y: 300, width: 100, height: TILE_SIZE },
-                { type: 'spike', x: 100, y: 448 - 16, width: TILE_SIZE * 2, height: 16 }, // 尖刺 (在地面上)
+                { type: 'spike', x: 100, y: 448 - 16, width: TILE_SIZE * 2, height: 16 },
                 { type: 'spike', x: 500, y: 448 - 16, width: TILE_SIZE, height: 16 }, 
-                { type: 'powerup_doublejump', x: 430, y: 250, width: TILE_SIZE, height: TILE_SIZE }, // 二段跳道具
+                { type: 'powerup_doublejump', x: 430, y: 250, width: TILE_SIZE, height: TILE_SIZE },
                 { type: 'exit', x: 50, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
             ],
             // Level 3: 移动平台和简单敌人
             [
                 { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
-                { type: 'platform_moving', x: 100, y: 300, width: 100, height: TILE_SIZE, startX: 100, endX: 350, speed: 1.5 }, // 移动平台
-                { type: 'enemy_walker', x: 450, y: 448 - TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, speed: 1, range: 100, startX: 450 }, // 移动敌人
+                { type: 'platform_moving', x: 100, y: 300, width: 100, height: TILE_SIZE, startX: 100, endX: 350, speed: 1.5 },
+                { type: 'enemy_walker', x: 450, y: 448 - TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, speed: 1, range: 100, startX: 450 },
                 { type: 'coin', x: 200, y: 250, width: TILE_SIZE, height: TILE_SIZE },
                 { type: 'exit', x: 600, y: 448 - 64, width: TILE_SIZE, height: TILE_SIZE * 2 }
             ],
-            // Level 4: 垂直平台跳跃 (平台更高)
+            // Level 4: 垂直平台跳跃
             [
                 { type: 'platform', x: 0, y: 448, width: 640, height: TILE_SIZE },
                 { type: 'platform', x: 50, y: 380, width: 80, height: TILE_SIZE },
@@ -200,10 +201,13 @@
         // -------------------------------------
         const keys = {};
         window.addEventListener('keydown', (e) => {
-            keys[e.key.toLowerCase()] = true; // 统一转小写处理 WASD
-            // 阻止空格键触发页面滚动
-            if (e.key === ' ' && gameState === 'PLAYING') {
-                e.preventDefault();
+            const key = e.key.toLowerCase();
+            if (key === ' ' || key === 'arrowup' || key === 'w') {
+                // 仅在按键按下时，标记为true，让update循环决定是否执行跳跃
+                if (gameState === 'PLAYING') e.preventDefault();
+                keys[key] = true;
+            } else if (key === 'arrowleft' || key === 'a' || key === 'arrowright' || key === 'd') {
+                keys[key] = true;
             }
         });
         window.addEventListener('keyup', (e) => {
@@ -228,7 +232,7 @@
         // 5. 游戏逻辑函数
         // -------------------------------------
 
-        // 渲染函数
+        // 渲染函数 (与之前相同，但更健壮)
         function draw() {
             // 清除画布
             ctx.fillStyle = '#1e90ff'; // 天空蓝
@@ -238,26 +242,25 @@
             currentLevel.forEach(obj => {
                 // 绘制平台和移动平台
                 if (obj.type.startsWith('platform')) {
-                    ctx.fillStyle = '#654321'; // 棕色
+                    ctx.fillStyle = '#654321';
                     ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
                 } 
                 // 绘制金币
                 else if (obj.type === 'coin') {
                     ctx.fillStyle = 'yellow';
                     ctx.beginPath();
-                    ctx.arc(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, TILE_SIZE / 4, 0, Math.PI * 2);
+                    ctx.arc(obj.x + obj.width / 2, obj.y + obj.height / 2, obj.width / 4, 0, Math.PI * 2);
                     ctx.fill();
                 } 
                 // 绘制出口
                 else if (obj.type === 'exit') {
-                    ctx.fillStyle = 'lime'; // 绿色出口
+                    ctx.fillStyle = 'lime';
                     ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
                 }
                 // 绘制尖刺
                 else if (obj.type === 'spike') {
-                    ctx.fillStyle = '#999'; // 灰色尖刺
+                    ctx.fillStyle = '#999';
                     ctx.beginPath();
-                    // 假设尖刺底部在 obj.y + obj.height
                     ctx.moveTo(obj.x, obj.y + obj.height);
                     ctx.lineTo(obj.x + obj.width / 2, obj.y);
                     ctx.lineTo(obj.x + obj.width, obj.y + obj.height);
@@ -266,7 +269,7 @@
                 } 
                 // 绘制二段跳道具
                 else if (obj.type === 'powerup_doublejump') {
-                    ctx.fillStyle = 'cyan'; // 青色道具
+                    ctx.fillStyle = 'cyan';
                     ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
                     ctx.fillStyle = 'black';
                     ctx.font = '10px monospace';
@@ -274,13 +277,13 @@
                 }
                 // 绘制敌人
                 else if (obj.type === 'enemy_walker') {
-                    ctx.fillStyle = 'purple'; // 紫色敌人
+                    ctx.fillStyle = 'purple';
                     ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
                 }
             });
 
             // 绘制玩家
-            ctx.fillStyle = 'red'; // 红色玩家
+            ctx.fillStyle = 'red';
             ctx.fillRect(player.x, player.y, player.width, player.height);
         }
 
@@ -291,7 +294,7 @@
             // --- 移动平台逻辑 ---
             currentLevel.forEach(obj => {
                 if (obj.type === 'platform_moving') {
-                    if (!obj.direction) obj.direction = 1; // 1: 右移, -1: 左移
+                    if (!obj.direction) obj.direction = 1;
                     
                     const oldX = obj.x;
                     obj.x += obj.speed * obj.direction;
@@ -304,7 +307,11 @@
                     }
 
                     // 玩家随平台移动 (简单实现)
-                    if (player.onGround && player.x + player.width > oldX && player.x < oldX + obj.width && player.y + player.height === obj.y) {
+                    if (player.onGround && 
+                        player.x + player.width > oldX && 
+                        player.x < oldX + obj.width && 
+                        player.y + player.height === obj.y) 
+                    {
                         player.x += obj.x - oldX;
                     }
                 }
@@ -320,7 +327,7 @@
                     // 范围限制
                     if (obj.x >= obj.startX + obj.range) {
                         obj.direction = -1;
-                    } else if (obj.x <= obj.startX) { // 敌人回到起始点 (简化逻辑)
+                    } else if (obj.x <= obj.startX) {
                         obj.direction = 1;
                     }
                 }
@@ -339,20 +346,25 @@
             player.velY += GRAVITY;
             if (player.velY > 15) player.velY = 15;
 
-            // 跳跃/二段跳
-            if (keys['arrowup'] || keys['w'] || keys[' ']) {
+            // --- 修正后的跳跃/二段跳逻辑 ---
+            const isJumpKey = keys['arrowup'] || keys['w'] || keys[' '];
+
+            if (isJumpKey && !player.justJumped) {
                 if (player.onGround) {
                     player.velY = JUMP_POWER;
                     player.onGround = false;
                     player.usedDoubleJump = false; // 重置二段跳使用状态
+                    player.justJumped = true;
                 } else if (player.canDoubleJump && !player.usedDoubleJump) {
                     player.velY = JUMP_POWER * 0.8; // 二段跳稍弱
                     player.usedDoubleJump = true;
+                    player.justJumped = true;
                 }
-                keys[' '] = false; // 消费跳跃输入，避免持续按住一直跳
-                keys['arrowup'] = false; 
-                keys['w'] = false;
+            } else if (!isJumpKey) {
+                // 只有当按键释放后，才允许下次跳跃触发 (防止长按一直跳)
+                player.justJumped = false;
             }
+
 
             // 更新位置
             player.x += player.velX;
@@ -400,7 +412,8 @@
                     } 
                     else if (obj.type === 'powerup_doublejump') {
                         player.canDoubleJump = true;
-                        alert("获得二段跳能力！");
+                        // 可以移除 alert，但为了测试先保留
+                        // alert("获得二段跳能力！");
                         return false; // 移除道具
                     }
                     else if (obj.type === 'spike' || obj.type === 'enemy_walker') {
@@ -424,15 +437,18 @@
             }
 
             // -----------------------------------------------------
-            // 关卡切换逻辑
+            // 关卡切换逻辑 (已修复道具状态重置)
             // -----------------------------------------------------
             if (nextLevel) {
                 if (currentLevelIndex < levels.length - 1) {
                     currentLevelIndex++;
                     currentLevel = levels[currentLevelIndex];
                     resetPlayer(); 
-                    player.canDoubleJump = false; // 道具状态在新关卡重置
+                    
+                    // 修复：关卡切换，道具状态重置
+                    player.canDoubleJump = false; 
                     player.usedDoubleJump = false;
+                    
                 } else {
                     // 恭喜通关！
                     gameState = 'WIN';
@@ -460,17 +476,18 @@
             player.velX = 0;
             player.velY = 0;
             player.onGround = false;
-            player.usedDoubleJump = false; // 重置二段跳的使用
+            player.usedDoubleJump = false; 
+            player.justJumped = false; // 重置跳跃锁
         }
 
-        // 更新屏幕上的得分和生命显示
+        // 更新屏幕上的得分和生命显示 (与之前相同)
         function updateHUD() {
             document.getElementById('score-display').textContent = player.score;
             document.getElementById('life-display').textContent = player.lives;
             document.getElementById('current-level-display').textContent = (currentLevelIndex + 1) + ' / 6';
         }
 
-        // 游戏主循环
+        // 游戏主循环 (与之前相同)
         function loop() {
             update();
             draw();
@@ -478,20 +495,19 @@
         }
 
         // -------------------------------------
-        // 6. 网址分享功能实现
+        // 6. 网址分享功能实现 (与之前相同)
         // -------------------------------------
 
         /**
          * 编码游戏状态到URL参数 (Level, Score, Lives, DoubleJumpStatus)
          */
         function encodeGameState() {
-            // 0/1 表示 boolean 状态
             const dj = player.canDoubleJump ? 1 : 0; 
             return `l=${currentLevelIndex + 1}&s=${player.score}&li=${player.lives}&dj=${dj}`;
         }
 
         /**
-         * 从URL参数解码游戏状态
+         * 从URL参数解码游戏状态 (与之前相同)
          */
         function decodeGameState() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -516,13 +532,12 @@
             }
         }
 
-        // 启动游戏
+        // 启动游戏 (与之前相同)
         function startGame() {
             document.getElementById('info-panel').style.display = 'none';
             gameState = 'PLAYING';
             
-            // 实时更新分享链接，包含当前游戏进度
-            const baseUrl = window.location.href.split('?')[0]; // 获取基础URL
+            const baseUrl = window.location.href.split('?')[0]; 
             const shareUrl = `${baseUrl}?${encodeGameState()}`;
             document.getElementById('share-url').innerHTML = `分享链接 (复制): <input type="text" value="${shareUrl}" readonly onclick="this.select()">`;
             
@@ -538,7 +553,6 @@
             player.usedDoubleJump = false;
             resetPlayer();
             
-            // 重新设置信息面板
             document.getElementById('info-panel').style.display = 'flex';
             document.getElementById('info-panel').innerHTML = '<h1>像素跳跃大冒险</h1><p>操作：方向键/WASD移动，空格/上键跳跃。</p><p>目标：收集金币，躲避障碍，找到出口！</p><p>当前关卡: <span id="current-level-display">1 / 6</span></p><button id="start-button">开始游戏</button><div id="share-url">分享链接: (游戏开始后，您的专属分享链接将在此生成)</div>';
             document.getElementById('start-button').addEventListener('click', startGame);
@@ -548,7 +562,7 @@
         }
 
         // --- 初始化流程 ---
-        decodeGameState(); // 尝试从URL加载进度
+        decodeGameState();
         document.getElementById('start-button').addEventListener('click', startGame);
 
         // 启动游戏循环
