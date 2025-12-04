@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>精灵伙伴养成记 (图片版)</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+        }
+        #game-container {
+            width: 400px;
+            height: 600px;
+            background-color: #fff;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        h1 {
+            color: #5C6BC0;
+            margin-top: 0;
+            font-size: 1.8em;
+        }
+
+        /* --- 精灵显示区域 --- */
+        #pet-display {
+            width: 100%;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            background-color: #E8F5E9; /* 浅绿背景 */
+            border-radius: 10px;
+        }
+        #pet-image {
+            width: 150px;
+            height: 150px;
+            /* 用于显示图片 */
+            background-size: contain; 
+            background-repeat: no-repeat;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px; /* 字体作为占位符 */
+            transition: transform 0.3s;
+        }
+        #pet-status-text {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #388E3C;
+            text-align: center;
+        }
+
+        /* --- 属性条 (HUD) --- */
+        #attributes {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .attribute-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .attr-label {
+            width: 80px;
+            font-weight: bold;
+        }
+        .bar-container {
+            flex-grow: 1;
+            height: 12px;
+            background-color: #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #aaa;
+        }
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s ease-out, background-color 0.3s;
+        }
+
+        /* --- 互动按钮 --- */
+        #actions {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+        }
+        .action-button {
+            display: flex;
+            flex-direction: row; /* 行排列 */
+            align-items: center;
+            cursor: pointer;
+            padding: 10px 15px; 
+            border-radius: 8px;
+            transition: background-color 0.2s;
+            background-color: #5C6BC0;
+            color: white;
+            border: none;
+            font-size: 1em;
+            font-weight: bold;
+        }
+        .action-button:hover {
+            background-color: #3F51B5;
+        }
+        .action-button span {
+            margin-left: 5px;
+        }
+
+        /* --- 额外信息 --- */
+        #debug-info {
+            margin-top: 15px;
+            font-size: 0.8em;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <h1>精灵伙伴养成记</h1>
+
+        <div id="pet-display">
+            <div id="pet-image">🥚</div> <div id="pet-status-text"></div>
+        </div>
+
+        <div id="attributes">
+            <div class="attribute-bar">
+                <span class="attr-label">饱食度</span>
+                <div class="bar-container">
+                    <div id="hunger-bar" class="bar-fill" style="width:100%; background-color: #4CAF50;"></div>
+                </div>
+            </div>
+            <div class="attribute-bar">
+                <span class="attr-label">心情值</span>
+                <div class="bar-container">
+                    <div id="happiness-bar" class="bar-fill" style="width:100%; background-color: #FFEB3B;"></div>
+                </div>
+            </div>
+            <div class="attribute-bar">
+                <span class="attr-label">清洁度</span>
+                <div class="bar-container">
+                    <div id="cleanliness-bar" class="bar-fill" style="width:100%; background-color: #03A9F4;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="actions">
+            <button class="action-button" onclick="PetGame.feed()">
+                <span>🍔 喂食</span>
+            </button>
+            <button class="action-button" onclick="PetGame.play()">
+                <span>🏀 玩耍</span>
+            </button>
+            <button class="action-button" onclick="PetGame.clean()">
+                <span>🧼 清洁</span>
+            </button>
+        </div>
+
+        <div id="debug-info">
+            阶段: <span id="stage-display">蛋</span> | 
+            年龄: <span id="age-display">0</span> 秒 | 
+            状态: <span id="health-status">正在加载...</span>
+        </div>
+    </div>
+    
+    <p style="margin-top: 20px;"><a href="index.html" style="color: #5C6BC0;">返回游戏大厅</a></p>
+
+    <script>
+        // --- 1. 核心配置与资源路径 ---
+        
+        const DECAY_RATE = 1000; // 每 1000ms (1秒) 更新一次状态
+        
+        const STAGES = {
+            EGG: '蛋',      
+            BABY: '幼崽',   
+            TEEN: '少年', 
+            ADULT: '成熟'  
+        };
+        
+        // 每个阶段需要的“年龄”（更新次数）
+        const EVOLUTION_AGE = {
+            BABY: 10,  // 10秒后破壳
+            TEEN: 30,  // 30秒后成长
+            ADULT: 60   // 60秒后成熟
+        };
+
+        // 资源路径 (已更新以匹配您的文件名和路径)
+        const ASSET_PATHS = {
+            '蛋': 'images/蛋.png',
+            '幼崽': 'images/幼崽.png',
+            '少年': 'images/少年.png',
+            '成熟': 'images/成熟.png',
+        };
+
+        const assets = {};
+        
+        // --- 2. 游戏状态和 DOM 元素 ---
+        
+        const PetState = {
+            hunger: 100,      // 0 = 饱, 100 = 饿
+            happiness: 100,   // 0 = 沮丧, 100 = 快乐
+            cleanliness: 100, // 0 = 干净, 100 = 脏
+            age: 0,           
+            currentStage: STAGES.EGG
+        };
+
+        const DOM = {
+            petImage: document.getElementById('pet-image'),
+            statusText: document.getElementById('pet-status-text'),
+            hungerBar: document.getElementById('hunger-bar'),
+            happinessBar: document.getElementById('happiness-bar'),
+            cleanlinessBar: document.getElementById('cleanliness-bar'),
+            stageDisplay: document.getElementById('stage-display'),
+            ageDisplay: document.getElementById('age-display'),
+            healthStatus: document.getElementById('health-status'),
+        };
+
+        let gameLoopInterval = null;
+        
+        // --- 3. 核心游戏逻辑 ---
+        
+        const PetGame = {
+            
+            // 3.1. 初始化
+            init: function() {
+                this.loadAssets().then(() => {
+                    DOM.healthStatus.textContent = "良好";
+                    this.updateDisplay();
+                    this.startGameLoop();
+                });
+            },
+
+            // 3.2. 资源加载
+            loadAssets: function() {
+                const promises = [];
+                for (const key in ASSET_PATHS) {
+                    const img = new Image();
+                    img.src = ASSET_PATHS[key];
+                    promises.push(new Promise((resolve) => {
+                        img.onload = () => {
+                            assets[key] = ASSET_PATHS[key];
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            console.error(`无法加载 ${ASSET_PATHS[key]}，请检查路径和文件名！`);
+                            assets[key] = null; // 标记为失败，使用占位符
+                            resolve(); 
+                        };
+                    }));
+                }
+                // 初始设置精灵图片
+                return Promise.all(promises).then(() => {
+                    this.setPetVisual(PetState.currentStage);
+                });
+            },
+            
+            setPetVisual: function(stage) {
+                // 检查图片是否加载成功
+                if (assets[stage]) {
+                    DOM.petImage.style.backgroundImage = `url(${assets[stage]})`;
+                    DOM.petImage.textContent = ''; // 清除Emoji占位符
+                    DOM.petImage.style.backgroundColor = 'transparent';
+                } else {
+                    // 图片加载失败时使用Emoji占位符
+                    DOM.petImage.style.backgroundImage = 'none';
+                    DOM.petImage.style.backgroundColor = '#FFCC80';
+                    DOM.petImage.textContent = this.getStageEmoji(stage);
+                }
+                
+                // 动画效果
+                DOM.petImage.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    DOM.petImage.style.transform = 'scale(1)';
+                }, 300);
+            },
+
+            getStageEmoji: function(stage) {
+                switch (stage) {
+                    case STAGES.EGG: return '🥚';
+                    case STAGES.BABY: return '🐣';
+                    case STAGES.TEEN: return '🦖';
+                    case STAGES.ADULT: return '🐲';
+                    default: return '❓';
+                }
+            },
+
+            // 3.3. 游戏主循环
+            startGameLoop: function() {
+                if (gameLoopInterval) clearInterval(gameLoopInterval);
+                gameLoopInterval = setInterval(this.updateGame.bind(this), DECAY_RATE);
+            },
+
+            updateGame: function() {
+                PetState.age++; 
+                
+                this.decayAttributes();
+                this.checkEvolution();
+                this.updateDisplay();
+                this.checkDeathCondition();
+            },
+            
+            decayAttributes: function() {
+                PetState.hunger = Math.min(100, PetState.hunger + 3);
+                
+                let happinessDecay = 2;
+                if (PetState.hunger > 70) happinessDecay += 1;
+                if (PetState.cleanliness > 70) happinessDecay += 1;
+                PetState.happiness = Math.max(0, PetState.happiness - happinessDecay);
+                
+                PetState.cleanliness = Math.min(100, PetState.cleanliness + 4);
+            },
+            
+            checkEvolution: function() {
+                let newStage = PetState.currentStage;
+
+                if (PetState.age >= EVOLUTION_AGE.ADULT && PetState.currentStage !== STAGES.ADULT) {
+                    newStage = STAGES.ADULT;
+                } else if (PetState.age >= EVOLUTION_AGE.TEEN && PetState.currentStage !== STAGES.TEEN && PetState.currentStage !== STAGES.ADULT) {
+                    newStage = STAGES.TEEN;
+                } else if (PetState.age >= EVOLUTION_AGE.BABY && PetState.currentStage === STAGES.EGG) {
+                    newStage = STAGES.BABY;
+                }
+
+                if (newStage !== PetState.currentStage) {
+                    PetState.currentStage = newStage;
+                    this.setPetVisual(newStage);
+                    DOM.statusText.textContent = `🎉 恭喜！已进化至【${newStage}】形态！`;
+                } else {
+                    this.updateStatusText();
+                }
+            },
+            
+            checkDeathCondition: function() {
+                if (PetState.hunger >= 95 && PetState.happiness <= 10) {
+                    DOM.healthStatus.textContent = "💔 死亡！缺乏照顾！";
+                    clearInterval(gameLoopInterval);
+                    DOM.statusText.textContent = "😭 游戏结束！您的精灵已经离您而去。";
+                    document.querySelectorAll('.action-button').forEach(btn => btn.disabled = true);
+                } else if (PetState.happiness < 30 || PetState.hunger > 80 || PetState.cleanliness > 80) {
+                    DOM.healthStatus.textContent = "😔 状态不佳！";
+                } else {
+                    DOM.healthStatus.textContent = "😊 良好";
+                }
+            },
+
+            updateStatusText: function() {
+                 let text = '';
+                 if (PetState.currentStage === STAGES.EGG) {
+                     text = '耐心等待破壳...';
+                 } else if (PetState.hunger > 80) {
+                     text = '我饿了，快喂我！';
+                 } else if (PetState.happiness < 40) {
+                     text = '我很无聊，陪我玩！';
+                 } else if (PetState.cleanliness > 80) {
+                     text = '我太脏了，需要洗澡...';
+                 } else {
+                     text = '感觉棒极了！';
+                 }
+                 DOM.statusText.textContent = text;
+            },
+
+            // 3.4. 界面更新
+            updateDisplay: function() {
+                DOM.stageDisplay.textContent = PetState.currentStage;
+                DOM.ageDisplay.textContent = PetState.age;
+
+                // 饱食度条
+                const hungerPercent = 100 - PetState.hunger;
+                DOM.hungerBar.style.width = `${hungerPercent}%`;
+                DOM.hungerBar.style.backgroundColor = PetState.hunger > 70 ? '#F44336' : '#4CAF50';
+                
+                // 心情值条
+                DOM.happinessBar.style.width = `${PetState.happiness}%`;
+                DOM.happinessBar.style.backgroundColor = PetState.happiness < 30 ? '#2196F3' : '#FFEB3B';
+                
+                // 清洁度条
+                const cleanPercent = 100 - PetState.cleanliness;
+                DOM.cleanlinessBar.style.width = `${cleanPercent}%`;
+                DOM.cleanlinessBar.style.backgroundColor = PetState.cleanliness > 70 ? '#795548' : '#03A9F4';
+            },
+            
+            // 3.5. 互动行为
+            feed: function() {
+                if (PetState.currentStage === STAGES.EGG) {
+                    DOM.statusText.textContent = "❌ 蛋壳还没破，不能吃东西哦！";
+                    return;
+                }
+                PetState.hunger = Math.max(0, PetState.hunger - 30);
+                PetState.cleanliness = Math.min(100, PetState.cleanliness + 5);
+                this.updateDisplay();
+                this.updateStatusText();
+            },
+
+            play: function() {
+                 if (PetState.currentStage === STAGES.EGG) {
+                    DOM.statusText.textContent = "❌ 蛋壳还没破，不能玩耍哦！";
+                    return;
+                }
+                PetState.happiness = Math.min(100, PetState.happiness + 25);
+                PetState.hunger = Math.min(100, PetState.hunger + 10);
+                PetState.cleanliness = Math.min(100, PetState.cleanliness + 10);
+                this.updateDisplay();
+                this.updateStatusText();
+            },
+
+            clean: function() {
+                 if (PetState.currentStage === STAGES.EGG) {
+                    DOM.statusText.textContent = "❌ 蛋壳是干净的！";
+                    return;
+                }
+                PetState.cleanliness = Math.max(0, PetState.cleanliness - 40);
+                PetState.happiness = Math.min(100, PetState.happiness + 5);
+                this.updateDisplay();
+                this.updateStatusText();
+            }
+        };
+
+        // --- 4. 启动游戏 ---
+        window.onload = function() {
+            PetGame.init();
+        };
+
+        // 暴露给 HTML onclick
+        window.PetGame = PetGame;
+    </script>
+</body>
+</html>
