@@ -190,27 +190,27 @@
         // --- 2. 资源路径 (请确保您的图片在此目录下) ---
         const ASSETS = {
             // 背景图
-            '背景-教室': '2Dplrun/images/图书馆.png',
-            '背景-宿舍': '2Dplrun/images/宿舍.png',
-            '背景-咖啡厅': '2Dplrun/images/咖啡店.png',
+            '背景-教室': 'images/图书馆.png',
+            '背景-宿舍': 'images/宿舍.png',
+            '背景-咖啡厅': 'images/咖啡店.png',
 
             // 雾依立绘
-            '立绘-雾依-常态': '2Dplrun/images/雾依-常态.png',
-            '立绘-雾依-开心': '2Dplrun/images/雾依-开心.png',
-            '立绘-雾依-害羞': '2Dplrun/images/雾依-害羞.png',
-            '立绘-雾依-不高兴': '2Dplrun/images/雾依-不高兴.png',
+            '立绘-雾依-常态': 'images/雾依-常态.png',
+            '立绘-雾依-开心': 'images/雾依-开心.png',
+            '立绘-雾依-害羞': 'images/雾依-害羞.png',
+            '立绘-雾依-不高兴': 'images/雾依-不高兴.png',
             
             // 程续立绘
-            '立绘-程续-常态': '2Dplrun/images/程续-常态.png',
-            '立绘-程续-开心': '2Dplrun/images/程续-开心.png',
-            '立绘-程续-害羞': '2Dplrun/images/程续-害羞.png',
-            '立绘-程续-不高兴': '2Dplrun/images/程续-不高兴.png',
+            '立绘-程续-常态': 'images/程续-常态.png',
+            '立绘-程续-开心': 'images/程续-开心.png',
+            '立绘-程续-害羞': 'images/程续-害羞.png',
+            '立绘-程续-不高兴': 'images/程续-不高兴.png',
 
             // 栗珥立绘
-            '立绘-栗珥-常态': '2Dplrun/images/栗珥-常态.png',
-            '立绘-栗珥-开心': '2Dplrun/images/栗珥-开心.jpg', 
-            '立绘-栗珥-害羞': '2Dplrun/images/栗珥-害羞.png',
-            '立绘-栗珥-不高兴': '2Dplrun/images/栗珥-不高兴.png',
+            '立绘-栗珥-常态': 'images/栗珥-常态.png',
+            '立绘-栗珥-开心': 'images/栗珥-开心.jpg', 
+            '立绘-栗珥-害羞': 'images/栗珥-害羞.png',
+            '立绘-栗珥-不高兴': 'images/栗珥-不高兴.png',
         };
 
         // --- 3. DOM 引用 ---
@@ -242,7 +242,7 @@
             CHOICE_DAY1_A: {
                 options: [
                     { text: '选项1: 起床，为了不挂科冲啊！ (专业课)', next: 'SCENE_DAY1_CLASS_WUYI', changes: { workEffort: 5 } },
-                    { text: '选项2: 再睡十分钟。 (程续略不爽)', next: 'SCENE_DAY1_SLEEP', changes: { affChengxu: -5, workEffort: -5 } },
+                    { text: '选项2: 再睡十分钟。', next: 'SCENE_DAY1_SLEEP', changes: { affChengxu: -10, workEffort: -5 } },
                     { text: '选项3: 起来后先给妹妹栗珥发个信息问候。', next: 'SCENE_DAY1_CALL_LIRUI', changes: { affLirui: 10 } }
                 ]
             },
