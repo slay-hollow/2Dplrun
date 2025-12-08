@@ -159,6 +159,8 @@
             栗珥: <span id="aff-lirui">60</span><br>
             军师: <span id="flag-junshi">否</span> | 
             努力值: <span id="work-effort">30</span>
+            金钱: <span id="money">500</span> |
+            压力: <span id="stress">0</span>
         </div>
 
         <div id="dialog-box">
@@ -172,21 +174,26 @@
     
     <script>
         // --- 1. 游戏状态 ---
-        const GameState = {
-            currentScene: 'SCENE_START',
-            dialogIndex: 0,
-            
-            // 核心属性
-            affWuyi: 50,
-            affChengxu: 50,
-            affLirui: 60,
-            
-            // 关键旗标
-            flagJunshi: false, 
-            flagConfess: 'NONE', 
-            workEffort: 30, 
-        };
-
+     const GameState = {
+    currentScene: 'SCENE_START',
+    dialogIndex: 0,
+    
+    // 核心属性
+    affWuyi: 50,
+    affChengxu: 50,
+    affLirui: 60,
+    
+    // 新增资源属性
+    money: 500,  // 初始生活费
+    stress: 0,   // 初始压力
+    
+    // 关键旗标
+    flagJunshi: false, 
+    flagConfess: 'NONE', 
+    workEffort: 30, 
+    // 新增旗标：栗珥是否发现你约会
+    flagLiruiSuspect: false 
+};
         // --- 2. 资源路径 (请确保您的图片在此目录下) ---
         const ASSETS = {
             // 背景图
@@ -228,6 +235,8 @@
             spriteWuyi: document.getElementById('sprite-wuyi'),
             spriteChengxu: document.getElementById('sprite-chengxu'),
             spriteLirui: document.getElementById('sprite-lirui'),
+            money: document.getElementById('money'), // 需要在HTML加 <span id="money"></span>
+            stress: document.getElementById('stress'), // 需要在HTML加 <span id="stress"></span>
         };
     </script>
   <script>
@@ -559,12 +568,25 @@
             ],
             
             CHOICE_MONTH3_PLAN: {
-                options: [
-                    { text: '选项1: 努力投简历，找一份与专业相关的实习。', next: 'SCENE_MONTH3_WORK', changes: { workEffort: 20 } },
-                    { text: '选项2: 找雾依/程续/栗珥中好感最高的那个，进行一次深度约会。', next: 'SCENE_MONTH3_DATE_HIGH_AFF' },
-                    { text: '选项3: 谁也不管，沉迷游戏和小说，彻底放飞自我。', next: 'SCENE_MONTH3_IDLE', changes: { workEffort: -10, affWuyi: -5, affChengxu: -5, affLirui: -5 } }
-                ]
-            },
+             options: [
+        { 
+            text: '选项1: 疯狂兼职赚钱 (金钱+500, 压力+30, 努力值-10)', 
+            next: 'SCENE_MONTH3_WORK', 
+            changes: { money: 500, stress: 30, workEffort: -10 } 
+        },
+        { 
+            text: '选项2: 购买昂贵的演唱会门票约雾依 (金钱-300, 雾依好感+20)', 
+            condition: () => GameState.money >= 300, // 没钱不能选！
+            next: 'SCENE_DATE_WUYI_CONCERT', 
+            changes: { money: -300, affWuyi: 20, stress: -10 } 
+        },
+        { 
+            text: '选项3: 在宿舍打游戏躺平 (压力-30, 金钱-50, 全员好感微降)', 
+            next: 'SCENE_MONTH3_IDLE', 
+            changes: { stress: -30, money: -50, affWuyi: -2, affLirui: -2 } 
+        }
+    ]
+},
 
             // --- 分支 4.1：努力工作线 ---
             SCENE_MONTH3_WORK: [
@@ -718,7 +740,19 @@
                     { text: '选项3: 拒绝所有邀请，专注于自我学习和实习工作。', next: 'SCENE_MONTH4_WORK_HARD', changes: { workEffort: 20, affWuyi: -5, affChengxu: -5 } }
                 ]
             },
-            
+        // 在 STORY_DATA 里添加
+                // 在 STORY_DATA 里添加
+            SCENE_LIRUI_CHECK: [
+                 { name: '旁白', text: '你的手机突然响了，是栗珥发来的视频通话请求。', bg: '背景-宿舍' },
+                 { name: '栗珥', text: '哥哥！你在哪里？我好像听到旁边有女生的声音？', sprite: { 栗珥: '不高兴' } },
+                 { name: '主角', text: '（内心）糟糕，我现在正和雾依/程续在一起...怎么回答？', next: 'CHOICE_LIRUI_CHECK' }
+            ],
+            CHOICE_LIRUI_CHECK: {
+                  options: [
+                 { text: '撒谎：“我在图书馆自习呢。” (如果后续被拆穿，好感度清零)', next: 'SCENE_LIRUI_LIE', changes: { flagLiruiSuspect: true } },
+                 { text: '实话实说：“我和朋友在一起。”', next: 'SCENE_LIRUI_TRUTH', changes: { affLirui: -10 } }
+              ]
+            }        
             // --- 分支 5.1：攻略雾依线 - 辩论背后的真实 ---
             SCENE_MONTH4_WUYI_HELP: [
                 { name: '旁白', text: '你在图书馆帮雾依找到了一份关键数据。她看起来很疲惫。', bg: '背景-教室' },
@@ -927,6 +961,16 @@
             },
             SCENE_ENDING_PROCESS: [
                 { name: '系统', text: '正在根据最终好感度和旗标判定结局...', next: 'FUNCTION_CHECK_ENDING' }
+            ],
+                SCENE_SICK_FORCED: [
+                { name: '旁白', text: '（头晕目眩）你感觉身体沉重无比...', bg: '背景-宿舍' },
+                { name: '系统', text: '【警告】由于压力过大（>90），你强制病倒了，错过了一周的活动。', next: 'SCENE_SICK_RECOVERY' }
+            ], // <--- 记得加逗号
+
+            SCENE_SICK_RECOVERY: [
+                { name: '旁白', text: '休息了一周，扣除了 200 金钱看病，全员好感度微降。', 
+                  changes: { money: -200, stress: -50, affWuyi: -5, affChengxu: -5, affLirui: -5 }, 
+                  next: 'SCENE_MONTH3_START' } 
             ]
         };
 
@@ -937,7 +981,15 @@
             DOM.affChengxu.textContent = GameState.affChengxu;
             DOM.affLirui.textContent = GameState.affLirui;
             DOM.flagJunshi.textContent = GameState.flagJunshi ? '是' : '否';
-            DOM.workEffort.textContent = GameState.workEffort;
+            DOM.workEffort.textContent = GameState.workEffort;DOM.money.textContent = GameState.money;
+            DOM.stress.textContent = GameState.stress;
+           // 压力过大警告颜色
+        if (GameState.stress > 80) {
+            DOM.stress.style.color = 'red';
+    }   else {
+            DOM.stress.style.color = 'white';
+    }
+
         }
         
         function setBackground(bgName) {
@@ -1035,12 +1087,19 @@
                 if (changes.flagJunshi !== undefined) GameState.flagJunshi = changes.flagJunshi;
                 if (changes.flagConfess !== undefined) GameState.flagConfess = changes.flagConfess;
                 if (changes.workEffort) GameState.workEffort = Math.min(100, Math.max(0, GameState.workEffort + changes.workEffort));
+                // --- 新增：金钱和压力的计算 ---
+                if (changes.money) GameState.money = (GameState.money || 0) + changes.money; // 防止undefined
+                if (changes.stress) GameState.stress = Math.max(0, (GameState.stress || 0) + changes.stress);
             }
             
             updateHUD();
-            goToScene(nextScene);
+            if (GameState.stress > 90 && nextScene !== 'SCENE_SICK_RECOVERY') {
+                console.log("压力过大，强制生病！");
+                goToScene('SCENE_SICK_FORCED');
+            } else { // 否则正常跳转
+                goToScene(nextScene);
+            }
         }
-        
         function goToScene(sceneName) {
              if (sceneName === 'FUNCTION_END' || sceneName === 'FUNCTION_CHECK_ENDING') {
                 runEnding();
@@ -1071,6 +1130,23 @@
 
             // 4. 公务员相亲
             if (GameState.flagConfess === false && GameState.workEffort >= 70) { return 'ENDING_GOVERNMENT'; }
+            let money = GameState.money;
+            let work = GameState.workEffort;
+
+             // 1. 栗珥【病娇监禁结局】 (新增)
+             // 条件：好感度极高，但是你在途中多次撒谎(flagLiruiSuspect为真)
+             if (affL >= 90 && GameState.flagLiruiSuspect && GameState.flagConfess) { 
+             return 'ENDING_LIRUI_DARK'; 
+           }
+
+             // 2. 雾依【豪门入赘结局】 (新增)
+             // 条件：雾依好感高，且你努力值高，但你没钱（被她包养）
+              if (affW >= 80 && work >= 80 && money < 100 && GameState.flagConfess) {
+             return 'ENDING_WUYI_RICH';
+    }
+    
+             // 3. 破产结局 (新增)
+            if (money < 0) { return 'ENDING_BANKRUPT'; }
 
             // 5. 失败结局
             return 'ENDING_FAILURE';
@@ -1090,6 +1166,12 @@
                  case 'ENDING_WUYI': endingText = '【雾依结局】你的温柔最终融化了冰山，你们开始了甜蜜的校园恋情。'; break;
                  case 'ENDING_GOVERNMENT': endingText = '【公务员相亲结局】你虽然没谈恋爱，但成功上岸，开始了相亲之旅。'; break;
                  case 'ENDING_FAILURE': default: endingText = '【失败结局】大学四年，你错过了所有的机会，毕业即失业。'; break;
+                 case 'ENDING_LIRUI_DARK':  endingText = '【栗珥-笼中鸟结局】“哥哥骗了我呢...” 栗珥微笑着没收了你的手机和身份证，从此你们永远在一起了。';  setBackground('背景-宿舍'); break;
+                 case 'ENDING_WUYI_RICH': endingText = '【雾依-软饭硬吃结局】虽然你身无分文，但你的才华打动了雾依。她继承了家业，你成为了她背后的男人。'; break;
+                 case 'ENDING_BANKRUPT':endingText = '【破产结局】因为过度挥霍，你连毕业证都没拿就被迫退学打工还债。爱情？那是有钱人的游戏。'; break;
+        // ... 原有结局 ...
+    }
+    // ... 显示文本 ...
              }
              
              DOM.charName.textContent = '【命运的终章】';
